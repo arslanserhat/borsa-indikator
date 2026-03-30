@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import StockChart from '@/components/chart/TradingViewWidget';
 import { addToWatchlist, getWatchlist, removeFromWatchlist } from '@/lib/storage';
@@ -27,6 +27,23 @@ export default function ChartPage() {
   const { analysis } = useAnalysis(symbol);
   const isMobile = useIsMobile();
 
+  // Grafik component'inden canli fiyat al (tek kaynak)
+  const handlePriceUpdate = useCallback((price: number, changePercent: number, high: number, low: number, volume: number) => {
+    setStock(prev => ({
+      ...(prev || { kod: symbol, ad: '', degisim: 0, oncekiKapanis: 0, acilis: 0, alis: 0, satis: 0, piyasaDegeri: 0, fk: 0, oneri: 0, rsi: 0, macd: 0, adx: 0 }),
+      kod: symbol,
+      fiyat: price,
+      degisimYuzde: changePercent,
+      degisim: prev ? price - (prev.oncekiKapanis || prev.fiyat - prev.degisim) : 0,
+      yuksek: high || price,
+      dusuk: low || price,
+      hacim: volume || 0,
+    }));
+    // Browser tab title'i da guncelle
+    document.title = `${symbol} ${price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ${changePercent >= 0 ? '▲' : '▼'} ${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%`;
+  }, [symbol]);
+
+  // Ilk yuklemede stock detayi al (ad, piyasa degeri vs)
   useEffect(() => {
     setInWatchlist(getWatchlist().includes(symbol));
     const fetchStock = async () => {
@@ -37,8 +54,6 @@ export default function ChartPage() {
       } catch {}
     };
     fetchStock();
-    const interval = setInterval(fetchStock, 15000);
-    return () => clearInterval(interval);
   }, [symbol]);
 
   const toggleWatchlist = () => {
@@ -117,7 +132,7 @@ export default function ChartPage() {
           backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)',
           borderRadius: 'var(--radius)', overflow: 'hidden',
         }}>
-          <StockChart symbol={symbol} height={480} />
+          <StockChart symbol={symbol} height={480} onPriceUpdate={handlePriceUpdate} />
         </div>
 
         {/* Sağ: Analiz paneli */}

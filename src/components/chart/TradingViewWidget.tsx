@@ -6,6 +6,7 @@ import { createChart, ColorType, CrosshairMode, IChartApi, ISeriesApi } from 'li
 interface Props {
   symbol: string;
   height?: number;
+  onPriceUpdate?: (price: number, changePercent: number, high: number, low: number, volume: number) => void;
 }
 
 interface Candle {
@@ -32,7 +33,7 @@ const TIME_RANGES = [
 
 const LIVE_INTERVAL = 1000; // 1 saniye - maksimum hiz
 
-function StockChart({ symbol, height = 500 }: Props) {
+function StockChart({ symbol, height = 500, onPriceUpdate }: Props) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -58,6 +59,7 @@ function StockChart({ symbol, height = 500 }: Props) {
       setLastPrice(price);
       setPriceChange(change);
       setTickCount(c => c + 1);
+      onPriceUpdate?.(price, change, high, low, vol);
 
       // GRAFIK SON MUMU CANLI GUNCELLE
       if (candleSeriesRef.current && lastCandleRef.current) {
