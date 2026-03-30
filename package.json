@@ -15,6 +15,7 @@
     "@types/node": "^25.5.0",
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.14",
+    "@types/ws": "^8.18.1",
     "autoprefixer": "^10.4.27",
     "bcryptjs": "^3.0.3",
     "ioredis": "^5.10.1",
@@ -27,6 +28,7 @@
     "react-dom": "^18.3.1",
     "tailwindcss": "^4.2.2",
     "tradingview-ws": "^0.0.3",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "ws": "^8.20.0"
   }
 }
