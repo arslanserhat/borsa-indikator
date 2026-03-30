@@ -47,54 +47,88 @@ function StockChart({ symbol, height = 500 }: Props) {
   const [priceChange, setPriceChange] = useState<number>(0);
   const [tickCount, setTickCount] = useState(0);
 
-  // CANLI FIYAT - 1sn polling + grafik guncelleme
+  // CANLI FIYAT - WebSocket SSE + polling fallback
   useEffect(() => {
     let active = true;
+    let eventSource: EventSource | null = null;
+    let fallbackInterval: ReturnType<typeof setInterval> | null = null;
 
-    const update = async () => {
-      try {
-        const res = await fetch(`/api/stock/${symbol}`);
-        if (!res.ok || !active) return;
-        const json = await res.json();
-        if (!json.data || !active) return;
+    const updateChart = (price: number, change: number, vol: number, high: number, low: number) => {
+      if (!active) return;
+      setLastPrice(price);
+      setPriceChange(change);
+      setTickCount(c => c + 1);
 
-        const price = json.data.fiyat;
-        const change = json.data.degisimYuzde || 0;
-        const vol = json.data.hacim || 0;
-        const high = json.data.yuksek || price;
-        const low = json.data.dusuk || price;
+      // GRAFIK SON MUMU CANLI GUNCELLE
+      if (candleSeriesRef.current && lastCandleRef.current) {
+        const lastCandle = lastCandleRef.current;
+        const updatedCandle = {
+          ...lastCandle,
+          close: price,
+          high: Math.max(lastCandle.high, high || price),
+          low: Math.min(lastCandle.low, low || price),
+        };
+        lastCandleRef.current = updatedCandle;
+        candleSeriesRef.current.update(updatedCandle);
 
-        setLastPrice(price);
-        setPriceChange(change);
-        setTickCount(c => c + 1);
-
-        // GRAFIK SON MUMU CANLI GUNCELLE
-        if (candleSeriesRef.current && lastCandleRef.current) {
-          const lastCandle = lastCandleRef.current;
-          const updatedCandle = {
-            ...lastCandle,
-            close: price,
-            high: Math.max(lastCandle.high, high),
-            low: Math.min(lastCandle.low, low),
-          };
-          lastCandleRef.current = updatedCandle;
-          candleSeriesRef.current.update(updatedCandle);
-
-          // Hacim de guncelle
-          if (volumeSeriesRef.current) {
-            volumeSeriesRef.current.update({
-              time: lastCandle.time,
-              value: vol,
-              color: price >= lastCandle.open ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)',
-            } as any);
-          }
+        if (volumeSeriesRef.current && vol > 0) {
+          volumeSeriesRef.current.update({
+            time: lastCandle.time, value: vol,
+            color: price >= lastCandle.open ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)',
+          } as any);
         }
-      } catch {}
+      }
     };
 
-    update();
-    const iv = setInterval(update, LIVE_INTERVAL);
-    return () => { active = false; clearInterval(iv); };
+    // 1. SSE baglantisi dene (WebSocket -> SSE)
+    try {
+      eventSource = new EventSource(`/api/stream?symbols=${symbol}&mode=sse`);
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          updateChart(data.price, data.changePercent, data.volume, data.high, data.low);
+        } catch {}
+      };
+
+      eventSource.onerror = () => {
+        // SSE basarisiz - polling fallback'e gec
+        console.log('[Chart] SSE baglanti hatasi, polling fallback');
+        eventSource?.close();
+        eventSource = null;
+        startPolling();
+      };
+    } catch {
+      startPolling();
+    }
+
+    // 2. Polling fallback (SSE basarisiz olursa)
+    function startPolling() {
+      if (fallbackInterval || !active) return;
+      const poll = async () => {
+        try {
+          const res = await fetch(`/api/stock/${symbol}`);
+          if (!res.ok || !active) return;
+          const json = await res.json();
+          if (json.data) {
+            updateChart(json.data.fiyat, json.data.degisimYuzde || 0, json.data.hacim || 0, json.data.yuksek || 0, json.data.dusuk || 0);
+          }
+        } catch {}
+      };
+      poll();
+      fallbackInterval = setInterval(poll, LIVE_INTERVAL);
+    }
+
+    // Ilk fiyati hemen al (SSE baglanti kurulana kadar)
+    fetch(`/api/stock/${symbol}`).then(r => r.json()).then(j => {
+      if (j.data && active) updateChart(j.data.fiyat, j.data.degisimYuzde || 0, j.data.hacim || 0, j.data.yuksek || 0, j.data.dusuk || 0);
+    }).catch(() => {});
+
+    return () => {
+      active = false;
+      eventSource?.close();
+      if (fallbackInterval) clearInterval(fallbackInterval);
+    };
   }, [symbol]);
 
   // GRAFIK OLUSTUR
