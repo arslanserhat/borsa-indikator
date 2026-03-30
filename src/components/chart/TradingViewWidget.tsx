@@ -9,70 +9,83 @@ interface Props {
 
 function TradingViewWidget({ symbol, height = 500 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const scriptRef = useRef<HTMLScriptElement | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Onceki widget'i temizle
+    // Tamamen temizle
     containerRef.current.innerHTML = '';
 
+    // TradingView widget container
+    const widgetContainer = document.createElement('div');
+    widgetContainer.className = 'tradingview-widget-container';
+    widgetContainer.style.height = '100%';
+    widgetContainer.style.width = '100%';
+
     const widgetDiv = document.createElement('div');
-    widgetDiv.className = 'tradingview-widget-container__widget';
-    widgetDiv.style.height = `${height}px`;
+    widgetDiv.id = `tradingview_${symbol}_${Date.now()}`;
+    widgetDiv.style.height = '100%';
     widgetDiv.style.width = '100%';
-    containerRef.current.appendChild(widgetDiv);
+    widgetContainer.appendChild(widgetDiv);
 
+    containerRef.current.appendChild(widgetContainer);
+
+    // TradingView Widget Script
     const script = document.createElement('script');
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-    script.type = 'text/javascript';
+    script.src = 'https://s3.tradingview.com/tv.js';
     script.async = true;
-    script.innerHTML = JSON.stringify({
-      autosize: true,
-      symbol: `BIST:${symbol}`,
-      interval: 'D',
-      timezone: 'Europe/Istanbul',
-      theme: 'dark',
-      style: '1', // Candlestick
-      locale: 'tr',
-      backgroundColor: 'rgba(10, 10, 15, 1)',
-      gridColor: 'rgba(42, 42, 62, 0.3)',
-      hide_top_toolbar: false,
-      hide_legend: false,
-      allow_symbol_change: true,
-      save_image: true,
-      calendar: false,
-      hide_volume: false,
-      support_host: 'https://www.tradingview.com',
-      studies: [
-        'STD;SMA',           // SMA
-        'STD;RSI',           // RSI
-        'STD;MACD',          // MACD
-        'STD;Bollinger_Bands', // Bollinger Bands
-      ],
-      withdateranges: true,
-      details: true,
-      hotlist: false,
-      show_popup_button: true,
-      popup_width: '1000',
-      popup_height: '650',
-    });
-
-    containerRef.current.appendChild(script);
-    scriptRef.current = script;
+    script.onload = () => {
+      if (typeof (window as any).TradingView !== 'undefined') {
+        new (window as any).TradingView.widget({
+          container_id: widgetDiv.id,
+          autosize: true,
+          symbol: `BIST:${symbol}`,
+          interval: 'D',
+          timezone: 'Europe/Istanbul',
+          theme: 'dark',
+          style: '1',
+          locale: 'tr',
+          toolbar_bg: '#0a0a0f',
+          enable_publishing: false,
+          allow_symbol_change: true,
+          save_image: true,
+          hide_volume: false,
+          studies: [
+            'MASimple@tv-basicstudies',
+            'RSI@tv-basicstudies',
+            'MACD@tv-basicstudies',
+            'BB@tv-basicstudies',
+          ],
+          show_popup_button: true,
+          popup_width: '1000',
+          popup_height: '650',
+          withdateranges: true,
+          details: true,
+          calendar: false,
+        });
+      }
+    };
+    document.head.appendChild(script);
 
     return () => {
       if (containerRef.current) {
         containerRef.current.innerHTML = '';
       }
+      // Script temizligi
+      try { document.head.removeChild(script); } catch {}
     };
   }, [symbol, height]);
 
   return (
     <div
       ref={containerRef}
-      className="tradingview-widget-container"
-      style={{ height: `${height}px`, width: '100%' }}
+      style={{
+        height: `${height}px`,
+        width: '100%',
+        backgroundColor: '#0a0a0f',
+        borderRadius: '8px',
+        overflow: 'hidden',
+      }}
     />
   );
 }
