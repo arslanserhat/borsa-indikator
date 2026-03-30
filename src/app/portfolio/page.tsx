@@ -73,7 +73,9 @@ export default function PortfolioPage() {
       const pnl = currentPrice > 0 ? currentValue - totalCost : 0;
       const pnlPercent = (currentPrice > 0 && totalCost > 0) ? ((currentValue - totalCost) / totalCost) * 100 : 0;
       const sig = signals[p.symbol];
-      return { ...p, currentPrice, totalCost, currentValue, pnl, pnlPercent, stock, sig };
+      const stopLoss = Math.round(p.avgCost * 0.93 * 100) / 100; // %7 stop-loss
+      const stopHit = currentPrice > 0 && currentPrice <= stopLoss;
+      return { ...p, currentPrice, totalCost, currentValue, pnl, pnlPercent, stock, sig, stopLoss, stopHit };
     });
   }, [portfolio, stocks, signals]);
 
@@ -322,6 +324,7 @@ export default function PortfolioPage() {
                 <th style={thStyle}>Adet</th>
                 <th style={thStyle}>Maliyet</th>
                 <th style={thStyle}>Fiyat</th>
+                <th style={thStyle}>Stop-Loss</th>
                 <th style={thStyle}>Deger</th>
                 <th style={thStyle}>K/Z</th>
                 <th style={thStyle}>K/Z %</th>
@@ -333,14 +336,17 @@ export default function PortfolioPage() {
               {portfolioWithPrices.map((p) => {
                 const sigColor = p.sig ? (SIG_COLORS[p.sig.signal] || 'var(--text-muted)') : 'var(--text-muted)';
                 const isSellSignal = p.sig?.signal === 'SAT' || p.sig?.signal === 'GUCLU_SAT';
+                const isProfit = p.pnlPercent >= 5;
+                const isDanger = p.stopHit || p.pnlPercent <= -7;
+                const rowBg = isDanger ? 'rgba(255,77,106,0.06)' : isSellSignal ? 'rgba(255,77,106,0.03)' : isProfit ? 'rgba(0,216,151,0.03)' : 'transparent';
                 return (
                   <tr key={p.symbol}
                     style={{
                       borderBottom: '1px solid var(--border)', transition: 'background 0.15s',
-                      backgroundColor: isSellSignal ? 'rgba(255,77,106,0.03)' : 'transparent',
+                      backgroundColor: rowBg,
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = isSellSignal ? 'rgba(255,77,106,0.06)' : 'var(--bg-hover)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isSellSignal ? 'rgba(255,77,106,0.03)' : 'transparent')}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-hover)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = rowBg)}
                   >
                     {/* Sinyal */}
                     <td style={{ padding: '8px 10px', textAlign: 'center' }}>
@@ -376,6 +382,16 @@ export default function PortfolioPage() {
                     {/* Fiyat */}
                     <td style={{ ...tdStyle, fontWeight: '600', fontVariantNumeric: 'tabular-nums' }}>
                       {p.currentPrice > 0 ? p.currentPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) : '-'}
+                    </td>
+
+                    {/* Stop-Loss */}
+                    <td style={{
+                      ...tdStyle, fontVariantNumeric: 'tabular-nums', fontSize: '10px',
+                      color: p.stopHit ? 'var(--red)' : 'var(--text-muted)',
+                      fontWeight: p.stopHit ? '700' : '400',
+                    }}>
+                      {p.stopLoss.toFixed(2)}
+                      {p.stopHit && <span style={{ color: 'var(--red)', marginLeft: '4px', fontSize: '9px' }}>TETIKLENDI</span>}
                     </td>
 
                     {/* Değer */}
