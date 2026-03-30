@@ -6,7 +6,18 @@
  * Milisaniye seviyesinde canli fiyat akisi.
  */
 
-import WebSocket from 'ws';
+// Dynamic import ile ws'i yukle (Next.js bundling sorunu onleme)
+let WebSocketClass: any = null;
+async function getWS(): Promise<any> {
+  if (!WebSocketClass) {
+    try {
+      WebSocketClass = (await import('ws')).default;
+    } catch {
+      WebSocketClass = null;
+    }
+  }
+  return WebSocketClass;
+}
 
 export interface RealtimeUpdate {
   symbol: string;
@@ -22,7 +33,7 @@ export interface RealtimeUpdate {
 // === GLOBAL STATE ===
 const priceStore = new Map<string, RealtimeUpdate>();
 const subscribers = new Map<string, Set<(data: RealtimeUpdate) => void>>();
-let ws: WebSocket | null = null;
+let ws: any = null;
 let wsConnecting = false;
 let sessionId = '';
 const subscribedSymbols = new Set<string>();
@@ -42,24 +53,26 @@ function tvEncode(msg: string): string {
 }
 
 function tvSend(data: any): void {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  if (!ws || ws.readyState !== 1) return; // 1 = OPEN
   const msg = JSON.stringify(data);
   ws.send(tvEncode(msg));
 }
 
 // === WEBSOCKET BAGLANTISI ===
 
-function connect(): void {
-  if (ws && ws.readyState === WebSocket.OPEN) return;
+async function connect(): Promise<void> {
+  if (ws && ws.readyState === 1) return; // OPEN
   if (wsConnecting) return;
   wsConnecting = true;
 
   try {
-    ws = new WebSocket('wss://data.tradingview.com/socket.io/websocket', {
+    const WS = await getWS();
+    if (!WS) { wsConnecting = false; console.error('[WS] ws modulu yuklenemedi'); return; }
+
+    ws = new WS('wss://data.tradingview.com/socket.io/websocket', {
       origin: 'https://data.tradingview.com',
-      headers: {
-        'User-Agent': 'Mozilla/5.0',
-      },
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      perMessageDeflate: false, // mask hatasini onler
     });
 
     ws.on('open', () => {
@@ -79,7 +92,7 @@ function connect(): void {
       // Heartbeat
       if (heartbeatInterval) clearInterval(heartbeatInterval);
       heartbeatInterval = setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
+        if (ws && ws.readyState === 1) {
           ws.send(tvEncode('~h~1'));
         }
       }, 20000);
@@ -168,7 +181,7 @@ export function addSubscriber(symbol: string, callback: (data: RealtimeUpdate) =
   // WebSocket'e sembol ekle
   if (!subscribedSymbols.has(symbol)) {
     subscribedSymbols.add(symbol);
-    if (ws && ws.readyState === WebSocket.OPEN) {
+    if (ws && ws.readyState === 1) {
       tvSend({ m: 'quote_add_symbols', p: [sessionId, `BIST:${symbol}`] });
     }
   }
@@ -192,7 +205,7 @@ export function addSubscriber(symbol: string, callback: (data: RealtimeUpdate) =
         setTimeout(() => {
           if (!subscribers.has(symbol) || subscribers.get(symbol)!.size === 0) {
             subscribedSymbols.delete(symbol);
-            if (ws && ws.readyState === WebSocket.OPEN) {
+            if (ws && ws.readyState === 1) {
               tvSend({ m: 'quote_remove_symbols', p: [sessionId, `BIST:${symbol}`] });
             }
             // Hic subscriber kalmadiysa WS kapat
@@ -244,7 +257,7 @@ export async function fetchRealtimePrices(symbols: string[]): Promise<RealtimeUp
 
 export function getWSStatus() {
   return {
-    connected: ws !== null && ws.readyState === WebSocket.OPEN,
+    connected: ws !== null && ws.readyState === 1,
     activeSymbols: [...subscribedSymbols],
     subscriberCount: [...subscribers.values()].reduce((sum, s) => sum + s.size, 0),
   };
