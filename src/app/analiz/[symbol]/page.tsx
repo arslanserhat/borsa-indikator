@@ -371,12 +371,12 @@ function IndicatorsPanel({ indicators: ind }: { indicators: AnalysisResult['indi
       { label: 'Stoch %K', value: ind.stochK?.toFixed(1), status: ind.stochK < 20 ? 'buy' : ind.stochK > 80 ? 'sell' : 'neutral' },
       { label: 'Stoch %D', value: ind.stochD?.toFixed(1), status: ind.stochD < 20 ? 'buy' : ind.stochD > 80 ? 'sell' : 'neutral' },
       { label: 'CCI (20)', value: ind.cci20?.toFixed(1), status: ind.cci20 < -100 ? 'buy' : ind.cci20 > 100 ? 'sell' : 'neutral' },
-      { label: 'Williams %R', value: ind.williamsR?.toFixed(1), status: ind.williamsR < -80 ? 'buy' : ind.williamsR > -20 ? 'sell' : 'neutral' },
+      { label: 'Williams %R', value: ind.williamsR?.toFixed(2), status: ind.williamsR < -80 ? 'buy' : ind.williamsR > -20 ? 'sell' : 'neutral' },
     ]},
     { title: 'Trend', items: [
-      { label: 'MACD', value: ind.macdValue?.toFixed(3), status: ind.macdHist > 0 ? 'buy' : 'sell' },
-      { label: 'MACD Signal', value: ind.macdSignal?.toFixed(3), status: ind.macdValue > ind.macdSignal ? 'buy' : 'sell' },
-      { label: 'MACD Hist', value: ind.macdHist?.toFixed(3), status: ind.macdHist > 0 ? 'buy' : 'sell' },
+      { label: 'MACD', value: ind.macdValue?.toFixed(4), status: ind.macdHist > 0 ? 'buy' : 'sell' },
+      { label: 'MACD Signal', value: ind.macdSignal?.toFixed(4), status: ind.macdValue > ind.macdSignal ? 'buy' : 'sell' },
+      { label: 'MACD Hist', value: ind.macdHist?.toFixed(4), status: ind.macdHist > 0 ? 'buy' : 'sell' },
       { label: 'ADX', value: ind.adx?.toFixed(1), status: ind.adx > 25 ? 'buy' : 'neutral' },
       { label: 'P.SAR', value: ind.psar?.toFixed(2), status: ind.close > ind.psar ? 'buy' : 'sell' },
     ]},
@@ -386,9 +386,9 @@ function IndicatorsPanel({ indicators: ind }: { indicators: AnalysisResult['indi
       { label: 'ATR', value: ind.atr?.toFixed(2), status: 'neutral' },
     ]},
     { title: 'Oneri', items: [
-      { label: 'Genel', value: ind.recommendAll?.toFixed(2), status: ind.recommendAll > 0.1 ? 'buy' : ind.recommendAll < -0.1 ? 'sell' : 'neutral' },
-      { label: 'Indikatör', value: ind.recommendOther?.toFixed(2), status: ind.recommendOther > 0.1 ? 'buy' : ind.recommendOther < -0.1 ? 'sell' : 'neutral' },
-      { label: 'Hareketli Ort.', value: ind.recommendMA?.toFixed(2), status: ind.recommendMA > 0.1 ? 'buy' : ind.recommendMA < -0.1 ? 'sell' : 'neutral' },
+      { label: 'Genel', value: ind.recommendAll?.toFixed(4), status: ind.recommendAll > 0.1 ? 'buy' : ind.recommendAll < -0.1 ? 'sell' : 'neutral' },
+      { label: 'Indikatör', value: ind.recommendOther?.toFixed(4), status: ind.recommendOther > 0.1 ? 'buy' : ind.recommendOther < -0.1 ? 'sell' : 'neutral' },
+      { label: 'Hareketli Ort.', value: ind.recommendMA?.toFixed(4), status: ind.recommendMA > 0.1 ? 'buy' : ind.recommendMA < -0.1 ? 'sell' : 'neutral' },
     ]},
   ];
 

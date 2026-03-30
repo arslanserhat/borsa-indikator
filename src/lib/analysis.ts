@@ -50,7 +50,7 @@ async function fetchIndicators(symbol: string): Promise<TradingViewIndicators> {
     symbol: d[0] || symbol, name: d[8] || '',
     close: d[1] || 0, change: d[3] || 0, changePercent: d[2] || 0,
     high: d[4] || 0, low: d[5] || 0, volume: d[6] || 0, open: d[7] || 0,
-    prevClose: 0, bid: 0, ask: 0,
+    prevClose: (d[1] || 0) - (d[3] || 0), bid: 0, ask: 0,
     marketCap: d[34] || 0, pe: d[35] || 0,
     recommendAll: d[9] || 0, recommendOther: d[10] || 0, recommendMA: d[11] || 0,
     rsi: d[12] ?? 50, macdValue: d[13] || 0, macdSignal: d[14] || 0, macdHist: d[15] || 0,
