@@ -6,17 +6,138 @@
  * Milisaniye seviyesinde canli fiyat akisi.
  */
 
-// Dynamic import ile ws'i yukle (Next.js bundling sorunu onleme)
-let WebSocketClass: any = null;
-async function getWS(): Promise<any> {
-  if (!WebSocketClass) {
-    try {
-      WebSocketClass = (await import('ws')).default;
-    } catch {
-      WebSocketClass = null;
-    }
-  }
-  return WebSocketClass;
+// Node.js native https ile WebSocket (Next.js ws bundling sorunu onleme)
+function createRawWebSocket(url: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const https = require('https');
+    const crypto = require('crypto');
+    const { URL } = require('url');
+
+    const parsed = new URL(url);
+    const key = crypto.randomBytes(16).toString('base64');
+
+    const req = https.request({
+      hostname: parsed.hostname,
+      port: 443,
+      path: parsed.pathname + (parsed.search || ''),
+      method: 'GET',
+      headers: {
+        'Upgrade': 'websocket',
+        'Connection': 'Upgrade',
+        'Sec-WebSocket-Key': key,
+        'Sec-WebSocket-Version': '13',
+        'Origin': 'https://data.tradingview.com',
+        'User-Agent': 'Mozilla/5.0',
+      },
+    });
+
+    req.on('upgrade', (res: any, socket: any, head: any) => {
+      const listeners: Record<string, Function[]> = {};
+      let buffer = '';
+
+      const ws = {
+        readyState: 1,
+        send: (data: string) => {
+          try {
+            // WebSocket frame olustur (text frame, masked)
+            const payload = Buffer.from(data, 'utf-8');
+            const mask = crypto.randomBytes(4);
+            let header: Buffer;
+
+            if (payload.length < 126) {
+              header = Buffer.alloc(6);
+              header[0] = 0x81; // FIN + TEXT
+              header[1] = 0x80 | payload.length; // MASK + length
+              mask.copy(header, 2);
+            } else if (payload.length < 65536) {
+              header = Buffer.alloc(8);
+              header[0] = 0x81;
+              header[1] = 0x80 | 126;
+              header.writeUInt16BE(payload.length, 2);
+              mask.copy(header, 4);
+            } else {
+              header = Buffer.alloc(14);
+              header[0] = 0x81;
+              header[1] = 0x80 | 127;
+              header.writeBigUInt64BE(BigInt(payload.length), 2);
+              mask.copy(header, 10);
+            }
+
+            // Mask payload
+            const masked = Buffer.alloc(payload.length);
+            for (let i = 0; i < payload.length; i++) {
+              masked[i] = payload[i] ^ mask[i % 4];
+            }
+
+            socket.write(Buffer.concat([header, masked]));
+          } catch {}
+        },
+        close: () => {
+          try { socket.end(); ws.readyState = 3; } catch {}
+        },
+        on: (event: string, fn: Function) => {
+          if (!listeners[event]) listeners[event] = [];
+          listeners[event].push(fn);
+        },
+        emit: (event: string, ...args: any[]) => {
+          for (const fn of (listeners[event] || [])) fn(...args);
+        },
+      };
+
+      // Veri oku
+      socket.on('data', (chunk: Buffer) => {
+        try {
+          let offset = 0;
+          while (offset < chunk.length) {
+            const byte1 = chunk[offset];
+            const byte2 = chunk[offset + 1];
+            const opcode = byte1 & 0x0f;
+            const payloadLen = byte2 & 0x7f;
+
+            let dataStart = offset + 2;
+            let actualLen = payloadLen;
+
+            if (payloadLen === 126) {
+              actualLen = chunk.readUInt16BE(offset + 2);
+              dataStart = offset + 4;
+            } else if (payloadLen === 127) {
+              actualLen = Number(chunk.readBigUInt64BE(offset + 2));
+              dataStart = offset + 10;
+            }
+
+            if (dataStart + actualLen > chunk.length) break;
+
+            const payload = chunk.slice(dataStart, dataStart + actualLen);
+
+            if (opcode === 1) { // Text frame
+              ws.emit('message', payload);
+            } else if (opcode === 8) { // Close
+              ws.readyState = 3;
+              ws.emit('close');
+              socket.end();
+              return;
+            } else if (opcode === 9) { // Ping
+              // Pong gonder
+              const pong = Buffer.alloc(2);
+              pong[0] = 0x8A; pong[1] = 0;
+              socket.write(pong);
+            }
+
+            offset = dataStart + actualLen;
+          }
+        } catch {}
+      });
+
+      socket.on('close', () => { ws.readyState = 3; ws.emit('close'); });
+      socket.on('error', (err: any) => { ws.readyState = 3; ws.emit('error', err); });
+
+      resolve(ws);
+    });
+
+    req.on('error', reject);
+    req.setTimeout(10000, () => { req.destroy(); reject(new Error('Timeout')); });
+    req.end();
+  });
 }
 
 export interface RealtimeUpdate {
@@ -66,37 +187,24 @@ async function connect(): Promise<void> {
   wsConnecting = true;
 
   try {
-    const WS = await getWS();
-    if (!WS) { wsConnecting = false; console.error('[WS] ws modulu yuklenemedi'); return; }
+    ws = await createRawWebSocket('wss://data.tradingview.com/socket.io/websocket');
 
-    ws = new WS('wss://data.tradingview.com/socket.io/websocket', {
-      origin: 'https://data.tradingview.com',
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      perMessageDeflate: false, // mask hatasini onler
-    });
+    // Baglanti acik, session olustur
+    wsConnecting = false;
+    sessionId = generateSession();
+    console.log(`[WS] Baglandi, session: ${sessionId}`);
 
-    ws.on('open', () => {
-      wsConnecting = false;
-      sessionId = generateSession();
-      console.log(`[WS] Baglandi, session: ${sessionId}`);
+    tvSend({ m: 'quote_create_session', p: [sessionId] });
+    tvSend({ m: 'quote_set_fields', p: [sessionId, 'lp', 'ch', 'chp', 'volume', 'high_price', 'low_price', 'open_price', 'prev_close_price'] });
 
-      // Quote session olustur
-      tvSend({ m: 'quote_create_session', p: [sessionId] });
-      tvSend({ m: 'quote_set_fields', p: [sessionId, 'lp', 'ch', 'chp', 'volume', 'high_price', 'low_price', 'open_price', 'prev_close_price'] });
+    for (const sym of subscribedSymbols) {
+      tvSend({ m: 'quote_add_symbols', p: [sessionId, `BIST:${sym}`] });
+    }
 
-      // Onceden subscribe edilmis sembolleri tekrar ekle
-      for (const sym of subscribedSymbols) {
-        tvSend({ m: 'quote_add_symbols', p: [sessionId, `BIST:${sym}`] });
-      }
-
-      // Heartbeat
-      if (heartbeatInterval) clearInterval(heartbeatInterval);
-      heartbeatInterval = setInterval(() => {
-        if (ws && ws.readyState === 1) {
-          ws.send(tvEncode('~h~1'));
-        }
-      }, 20000);
-    });
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    heartbeatInterval = setInterval(() => {
+      if (ws && ws.readyState === 1) ws.send(tvEncode('~h~1'));
+    }, 20000);
 
     ws.on('message', (raw: Buffer) => {
       const data = raw.toString();
