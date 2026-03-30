@@ -18,7 +18,14 @@ export default function Dashboard() {
   const [signalFilter, setSignalFilter] = useState('');
 
   const isMobile = useIsMobile();
-  const { alerts, permissionGranted, requestPermission } = usePortfolioAlerts();
+  const { alerts, permissionGranted, soundEnabled, setSoundEnabled, requestPermission, checkPriceAlerts } = usePortfolioAlerts();
+
+  // ANLIK portfolio kontrolu - her stock guncellenmesinde (5sn)
+  useEffect(() => {
+    if (stocks.length > 0) {
+      checkPriceAlerts(stocks);
+    }
+  }, [stocks, checkPriceAlerts]);
 
   const fetchScan = useCallback(async () => {
     try {
@@ -81,18 +88,30 @@ export default function Dashboard() {
 
       <MarketSummary />
 
-      {/* Bildirim izni + Uyarılar */}
-      {!permissionGranted && (
-        <div onClick={requestPermission} style={{
-          padding: '10px 16px', marginBottom: '12px', borderRadius: 'var(--radius-sm)',
-          backgroundColor: 'var(--accent-bg)', border: '1px solid rgba(247,147,26,0.2)',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
-          fontSize: '12px', color: 'var(--accent)',
+      {/* Bildirim izni + Ses kontrolu */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+        {!permissionGranted && (
+          <div onClick={requestPermission} style={{
+            flex: 1, padding: '10px 16px', borderRadius: 'var(--radius-sm)',
+            backgroundColor: 'var(--accent-bg)', border: '1px solid rgba(247,147,26,0.2)',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+            fontSize: '12px', color: 'var(--accent)',
+          }}>
+            <span style={{ fontSize: '16px' }}>&#128276;</span>
+            Portfoyunuzdeki hisseler icin anlik bildirim almak icin tiklayin
+          </div>
+        )}
+        <button onClick={() => setSoundEnabled(!soundEnabled)} style={{
+          padding: '10px 16px', borderRadius: 'var(--radius-sm)',
+          backgroundColor: soundEnabled ? 'var(--green-bg)' : 'var(--bg-card)',
+          border: `1px solid ${soundEnabled ? 'rgba(0,216,151,0.3)' : 'var(--border)'}`,
+          cursor: 'pointer', fontSize: '12px', fontWeight: '600',
+          color: soundEnabled ? 'var(--green)' : 'var(--text-muted)',
+          display: 'flex', alignItems: 'center', gap: '6px',
         }}>
-          <span style={{ fontSize: '16px' }}>&#128276;</span>
-          Portfoyunuzdeki hisseler icin anlik bildirim almak icin tiklayin
-        </div>
-      )}
+          {soundEnabled ? '🔊' : '🔇'} Sesli Alarm {soundEnabled ? 'ACIK' : 'KAPALI'}
+        </button>
+      </div>
 
       {alerts.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
