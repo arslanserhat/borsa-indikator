@@ -10,9 +10,9 @@ RUN npm run build
 
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV NEXTAUTH_URL=http://94.138.209.208:3000
-ENV NEXTAUTH_SECRET=borsa-trading-simons-secret-2026-xK9mP2
-ENV DATABASE_URL=postgresql://postgres:postgres@e-sonuc-postgres:5432/borsa_trading
+
+# Secretlar .env veya docker run -e ile verilmeli
+# docker run -e NEXTAUTH_URL=... -e NEXTAUTH_SECRET=... -e DATABASE_URL=... borsa-indikator
 
 EXPOSE 3000
 

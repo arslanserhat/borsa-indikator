@@ -12,7 +12,7 @@ import Redis from 'ioredis';
 const redis = new Redis({
   host: process.env.REDIS_HOST || 'e-sonuc-redis',
   port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD || 'redis_secure_password_2026',
+  password: process.env.REDIS_PASSWORD || undefined,
   db: 10,
   retryStrategy: (times) => Math.min(times * 100, 3000),
   maxRetriesPerRequest: 3,
@@ -64,7 +64,7 @@ export async function getCachedPrice(symbol: string): Promise<any | null> {
   try {
     await ensureConnection();
     const data = await redis.get(`price:${symbol}`);
-    return data ? JSON.parse(data) : null;
+    return data ? safeJsonParse(data) : null;
   } catch { return null; }
 }
 
@@ -81,11 +81,15 @@ export async function pushTick(symbol: string, tick: any): Promise<void> {
   } catch {}
 }
 
+function safeJsonParse(str: string, fallback: any = null): any {
+  try { return JSON.parse(str); } catch { return fallback; }
+}
+
 export async function getRecentTicks(symbol: string, count: number = 100): Promise<any[]> {
   try {
     await ensureConnection();
     const data = await redis.lrange(`ticks:${symbol}`, 0, count - 1);
-    return data.map(d => JSON.parse(d));
+    return data.map(d => safeJsonParse(d)).filter(Boolean);
   } catch { return []; }
 }
 
@@ -101,7 +105,7 @@ export async function getCachedAnalysis(symbol: string): Promise<any | null> {
   try {
     await ensureConnection();
     const data = await redis.get(`analysis:${symbol}`);
-    return data ? JSON.parse(data) : null;
+    return data ? safeJsonParse(data) : null;
   } catch { return null; }
 }
 
@@ -117,7 +121,7 @@ export async function getCachedScan(): Promise<any | null> {
   try {
     await ensureConnection();
     const data = await redis.get('scan:result');
-    return data ? JSON.parse(data) : null;
+    return data ? safeJsonParse(data) : null;
   } catch { return null; }
 }
 
@@ -133,7 +137,7 @@ export async function getMarketState(): Promise<any | null> {
   try {
     await ensureConnection();
     const data = await redis.get('market:state');
-    return data ? JSON.parse(data) : null;
+    return data ? safeJsonParse(data) : null;
   } catch { return null; }
 }
 
@@ -149,7 +153,7 @@ export async function getMacroOverride(): Promise<any | null> {
   try {
     await ensureConnection();
     const data = await redis.get('market:override');
-    return data ? JSON.parse(data) : null;
+    return data ? safeJsonParse(data) : null;
   } catch { return null; }
 }
 

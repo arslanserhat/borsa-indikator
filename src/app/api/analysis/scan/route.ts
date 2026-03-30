@@ -27,9 +27,9 @@ const BIST100_EXTRA = new Set([
   'ULKER','VESBE','VESTL','YEOTK','ZOREN',
 ]);
 
-let isScanning = false;
+let scanPromise: Promise<any[]> | null = null;
 let lastScanTime = 0;
-const CACHE_TTL = 600_000; // 10 dakika - tam analiz yavastirir ama %100 dogru
+const CACHE_TTL = 600_000;
 
 // TÜM hisselerin sembol listesini çek
 async function getAllSymbols(): Promise<string[]> {
@@ -77,73 +77,80 @@ export async function GET() {
       return NextResponse.json({ data: redisCached, cached: true, source: 'redis', timestamp: new Date().toISOString() });
     }
 
-    // 2. Tarama başlat (veya devam eden taramayı bekle)
-    if (isScanning) {
-      return NextResponse.json({ data: [], scanning: true, message: 'Tarama devam ediyor...', timestamp: new Date().toISOString() });
+    // 2. Devam eden tarama varsa ayni promise'i bekle (race condition onleme)
+    if (scanPromise) {
+      const results = await scanPromise;
+      return NextResponse.json({ data: results, cached: false, source: 'awaited', timestamp: new Date().toISOString() });
     }
 
-    isScanning = true;
-
-    const symbols = await getAllSymbols();
-    if (symbols.length === 0) {
-      isScanning = false;
-      return NextResponse.json({ data: [], error: 'Sembol listesi alinamadi' });
+    // 3. Yeni tarama baslat
+    scanPromise = runScan();
+    try {
+      const results = await scanPromise;
+      return NextResponse.json({ data: results, cached: false, source: 'fresh', count: results.length, timestamp: new Date().toISOString() });
+    } finally {
+      scanPromise = null;
     }
-
-    const results: any[] = [];
-    const BATCH = 10; // 10 paralel = daha hizli
-
-    for (let i = 0; i < symbols.length; i += BATCH) {
-      const batch = symbols.slice(i, i + BATCH);
-      const promises = batch.map(async (sym: string) => {
-        try {
-          // TAM ANALİZ MOTORU - %100 TUTARLI
-          // %100 DOGRULUK - haber + mum + tüm sinyaller
-          const analysis = await analyzeStock(sym);
-          const endeks = BIST30.has(sym) ? 'BIST30' : BIST50_EXTRA.has(sym) ? 'BIST50' : BIST100_EXTRA.has(sym) ? 'BIST100' : '';
-
-          return {
-            symbol: sym,
-            name: analysis.name,
-            price: analysis.price,
-            changePct: analysis.changePercent,
-            score: analysis.compositeScore,
-            signal: analysis.signal,
-            signalText: analysis.signalText,
-            rsi: Math.round(analysis.indicators.rsi * 10) / 10,
-            macdHist: Math.round(analysis.indicators.macdHist * 1000) / 1000,
-            adx: Math.round(analysis.indicators.adx * 10) / 10,
-            relVol: Math.round(analysis.indicators.relativeVolume * 100) / 100,
-            trendUp: analysis.indicators.ema10 > analysis.indicators.ema20 && analysis.indicators.ema20 > analysis.indicators.ema50,
-            above200: analysis.price > analysis.indicators.ema200,
-            confidence: analysis.confidence,
-            riskLevel: analysis.riskLevel,
-            endeks,
-            sector: getStockSector(sym),
-          };
-        } catch { return null; }
-      });
-      const batchResults = await Promise.all(promises);
-      results.push(...batchResults.filter(Boolean));
-    }
-
-    results.sort((a, b) => b.score - a.score);
-
-    // Redis'e kaydet (5 dakika cache)
-    await cacheScan(results);
-    lastScanTime = Date.now();
-    isScanning = false;
-
-    return NextResponse.json({ data: results, cached: false, source: 'fresh', count: results.length, timestamp: new Date().toISOString() });
   } catch (error) {
-    isScanning = false;
     console.error('Scan error:', error);
-
-    // Hata durumunda Redis'ten eski veri dön
     const fallback = await getCachedScan();
     if (fallback) {
       return NextResponse.json({ data: fallback, cached: true, source: 'fallback', timestamp: new Date().toISOString() });
     }
     return NextResponse.json({ data: [], error: 'Tarama hatasi' }, { status: 500 });
   }
+}
+
+async function runScan(): Promise<any[]> {
+  const symbols = await getAllSymbols();
+  if (symbols.length === 0) return [];
+
+  const results: any[] = [];
+  const errors: string[] = [];
+  const BATCH = 10;
+  const MAX_TOTAL_TIMEOUT = 120_000; // 2 dakika max
+  const startTime = Date.now();
+
+  for (let i = 0; i < symbols.length; i += BATCH) {
+    // Toplam timeout kontrolu
+    if (Date.now() - startTime > MAX_TOTAL_TIMEOUT) {
+      console.warn(`[Scan] Timeout: ${results.length}/${symbols.length} tamamlandi`);
+      break;
+    }
+
+    const batch = symbols.slice(i, i + BATCH);
+    const promises = batch.map(async (sym: string) => {
+      try {
+        const analysis = await analyzeStock(sym);
+        const endeks = BIST30.has(sym) ? 'BIST30' : BIST50_EXTRA.has(sym) ? 'BIST50' : BIST100_EXTRA.has(sym) ? 'BIST100' : '';
+        return {
+          symbol: sym, name: analysis.name, price: analysis.price,
+          changePct: analysis.changePercent, score: analysis.compositeScore,
+          signal: analysis.signal, signalText: analysis.signalText,
+          rsi: Math.round(analysis.indicators.rsi * 10) / 10,
+          macdHist: Math.round(analysis.indicators.macdHist * 1000) / 1000,
+          adx: Math.round(analysis.indicators.adx * 10) / 10,
+          relVol: Math.round(analysis.indicators.relativeVolume * 100) / 100,
+          trendUp: analysis.indicators.ema10 > analysis.indicators.ema20 && analysis.indicators.ema20 > analysis.indicators.ema50,
+          above200: analysis.price > analysis.indicators.ema200,
+          confidence: analysis.confidence, riskLevel: analysis.riskLevel,
+          endeks, sector: getStockSector(sym),
+        };
+      } catch (err: any) {
+        errors.push(`${sym}: ${err?.message || 'bilinmeyen hata'}`);
+        return null;
+      }
+    });
+    const batchResults = await Promise.all(promises);
+    results.push(...batchResults.filter(Boolean));
+  }
+
+  if (errors.length > 0) {
+    console.warn(`[Scan] ${errors.length} hata: ${errors.slice(0, 5).join(', ')}${errors.length > 5 ? '...' : ''}`);
+  }
+
+  results.sort((a, b) => b.score - a.score);
+  await cacheScan(results);
+  lastScanTime = Date.now();
+  return results;
 }

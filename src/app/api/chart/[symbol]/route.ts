@@ -31,7 +31,7 @@ export async function GET(
 
   try {
     const { timeframe, bars } = getParams(range);
-    const candles = getChartData(params.symbol, timeframe, bars);
+    const candles = await getChartData(params.symbol, timeframe, bars);
 
     if (candles.length === 0) {
       return NextResponse.json({ error: 'Grafik verisi alınamadı' }, { status: 500 });

@@ -9,8 +9,14 @@ export async function POST(request: Request) {
     if (!name || !email || !password) {
       return NextResponse.json({ error: 'Tum alanlar zorunlu' }, { status: 400 });
     }
-    if (password.length < 6) {
-      return NextResponse.json({ error: 'Sifre en az 6 karakter olmali' }, { status: 400 });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ error: 'Gecerli bir email adresi girin' }, { status: 400 });
+    }
+    if (password.length < 8) {
+      return NextResponse.json({ error: 'Sifre en az 8 karakter olmali' }, { status: 400 });
+    }
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      return NextResponse.json({ error: 'Sifre buyuk harf, kucuk harf ve rakam icermeli' }, { status: 400 });
     }
 
     // Email kontrolü

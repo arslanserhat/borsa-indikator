@@ -400,20 +400,29 @@ function detectDivergence(candles: CandleData[], currentRSI: number): {
   const recentLow = Math.min(...recent.map(c => c.low));
   const prevLow = Math.min(...prev.map(c => c.low));
 
-  // Basit RSI hesapla (son 5 ve önceki 10 periyot için)
-  const calcSimpleRSI = (slice: CandleData[]): number => {
-    let gains = 0, losses = 0;
-    for (let i = 1; i < slice.length; i++) {
-      const change = slice[i].close - slice[i - 1].close;
-      if (change > 0) gains += change; else losses -= change;
+  // Wilder RSI hesaplama (exponential smoothing)
+  const calcRSI = (data: CandleData[], period: number = 14): number => {
+    if (data.length < period + 1) return 50;
+    let avgGain = 0, avgLoss = 0;
+    // Ilk periyot: basit ortalama
+    for (let i = 1; i <= period; i++) {
+      const change = data[i].close - data[i - 1].close;
+      if (change > 0) avgGain += change; else avgLoss -= change;
     }
-    const avgGain = gains / (slice.length - 1);
-    const avgLoss = losses / (slice.length - 1);
+    avgGain /= period;
+    avgLoss /= period;
+    // Sonraki periyotlar: exponential smoothing
+    for (let i = period + 1; i < data.length; i++) {
+      const change = data[i].close - data[i - 1].close;
+      avgGain = (avgGain * (period - 1) + (change > 0 ? change : 0)) / period;
+      avgLoss = (avgLoss * (period - 1) + (change < 0 ? -change : 0)) / period;
+    }
     if (avgLoss === 0) return 100;
     return 100 - (100 / (1 + avgGain / avgLoss));
   };
 
-  const prevRSI = calcSimpleRSI(candles.slice(-20, -5));
+  // Onceki RSI: son 20 muma kadar, son 5 haric
+  const prevRSI = calcRSI(candles.slice(0, -5));
 
   // Bearish Divergence: Fiyat yeni yüksek yapıyor ama RSI düşüyor
   if (recentHigh > prevHigh * 1.01 && currentRSI < prevRSI - 3) {
@@ -618,7 +627,7 @@ export async function analyzeStock(symbol: string, options?: { skipNews?: boolea
 
   let candles: CandleData[] = [];
   if (!options?.skipCandles) {
-    try { const { getChartData } = require('./tv-chart'); candles = await getChartData(symbol, 'D', 66); } catch {}
+    try { const { getChartData } = await import('./tv-chart'); candles = await getChartData(symbol, 'D', 66); } catch {}
   }
 
   let newsItems: NewsItem[] = [];

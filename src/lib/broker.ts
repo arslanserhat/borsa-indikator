@@ -81,12 +81,14 @@ interface RetryConfig {
   maxRetries: number;
   baseDelayMs: number;
   maxDelayMs: number;
+  totalTimeoutMs: number;
 }
 
 const DEFAULT_RETRY: RetryConfig = {
-  maxRetries: 4,        // Max 4 deneme
-  baseDelayMs: 1000,    // 1 saniye başlangıç
-  maxDelayMs: 16000,    // 16 saniye max bekleme
+  maxRetries: 4,
+  baseDelayMs: 1000,
+  maxDelayMs: 8000,
+  totalTimeoutMs: 15000,  // 15sn toplam timeout
 };
 
 async function sleep(ms: number): Promise<void> {
@@ -98,8 +100,15 @@ async function withRetry<T>(
   config: RetryConfig = DEFAULT_RETRY,
 ): Promise<{ result: T | null; retryCount: number; error?: string }> {
   let lastError = '';
+  const startTime = Date.now();
 
   for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+    // Toplam timeout kontrolu
+    if (Date.now() - startTime > config.totalTimeoutMs) {
+      lastError = `Toplam timeout asildi (${config.totalTimeoutMs}ms)`;
+      break;
+    }
+
     try {
       const result = await fn();
       return { result, retryCount: attempt };
@@ -107,19 +116,20 @@ async function withRetry<T>(
       lastError = err?.message || String(err);
       const statusCode = err?.statusCode || err?.status || 0;
 
-      // 429 (Rate Limit) veya 5xx (Server Error) = retry
       if (statusCode === 429 || (statusCode >= 500 && statusCode < 600) || !statusCode) {
         if (attempt < config.maxRetries) {
           const delay = Math.min(
-            config.baseDelayMs * Math.pow(2, attempt), // 1s, 2s, 4s, 8s, 16s
+            config.baseDelayMs * Math.pow(2, attempt),
             config.maxDelayMs
           );
-          console.log(`[BROKER] Retry ${attempt + 1}/${config.maxRetries} - ${delay}ms bekle (hata: ${lastError})`);
+          // Kalan sureye gore delay kisalt
+          const remaining = config.totalTimeoutMs - (Date.now() - startTime);
+          if (delay > remaining) break;
+          console.log(`[BROKER] Retry ${attempt + 1}/${config.maxRetries} - ${delay}ms bekle`);
           await sleep(delay);
           continue;
         }
       }
-      // 4xx (Client Error, 429 hariç) = retry yapma
       break;
     }
   }
@@ -147,7 +157,7 @@ export async function checkOrphanedOrders(userId: number): Promise<OrphanedOrder
       FROM trades
       WHERE user_id = $1
         AND created_at > NOW() - INTERVAL '24 hours'
-        AND notes LIKE '%PENDING%'
+        AND (notes LIKE '%PENDING%' OR notes LIKE '%SIMULASYON%')
       ORDER BY created_at DESC
     `, [userId]);
 

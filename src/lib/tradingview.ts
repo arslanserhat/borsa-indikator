@@ -4,6 +4,40 @@ const SCANNER_URL_HOST = 'scanner.tradingview.com';
 const TURKEY_PATH = '/turkey/scan';
 const FOREX_PATH = '/forex/scan';
 
+// Circuit Breaker: TradingView API cokerse tum app cokmesin
+const circuitBreaker = {
+  failures: 0,
+  lastFailure: 0,
+  isOpen: false,
+  threshold: 5,         // 5 ardisik hata
+  resetTimeout: 30_000, // 30sn sonra tekrar dene
+};
+
+function checkCircuitBreaker(): boolean {
+  if (!circuitBreaker.isOpen) return true;
+  if (Date.now() - circuitBreaker.lastFailure > circuitBreaker.resetTimeout) {
+    circuitBreaker.isOpen = false;
+    circuitBreaker.failures = 0;
+    console.log('[TradingView] Circuit breaker reset - tekrar deneniyor');
+    return true;
+  }
+  return false;
+}
+
+function recordSuccess() {
+  circuitBreaker.failures = 0;
+  circuitBreaker.isOpen = false;
+}
+
+function recordFailure() {
+  circuitBreaker.failures++;
+  circuitBreaker.lastFailure = Date.now();
+  if (circuitBreaker.failures >= circuitBreaker.threshold) {
+    circuitBreaker.isOpen = true;
+    console.error(`[TradingView] Circuit breaker ACIK - ${circuitBreaker.threshold} ardisik hata. ${circuitBreaker.resetTimeout / 1000}sn beklenecek.`);
+  }
+}
+
 // Belirli bir sembol için belirli kolonları çek (analiz modülü tarafından kullanılır)
 export async function fetchStockIndicators(symbol: string, columns: string[]): Promise<any> {
   const body = {
@@ -19,7 +53,10 @@ export async function fetchStockIndicators(symbol: string, columns: string[]): P
 
 // Node.js https modülü ile POST (Next.js fetch User-Agent sorunu nedeniyle)
 function postScanner(path: string, body: object): Promise<any> {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  if (!checkCircuitBreaker()) {
+    return Promise.reject(new Error('TradingView API gecici olarak devre disi (circuit breaker)'));
+  }
+
   const https = require('https');
 
   return new Promise((resolve, reject) => {
@@ -41,17 +78,20 @@ function postScanner(path: string, body: object): Promise<any> {
         try {
           console.log('[TradingView] Response status:', res.statusCode, 'Data length:', data.length);
           if (data.length < 100) console.log('[TradingView] Response body:', data);
+          recordSuccess();
           resolve(JSON.parse(data));
         } catch {
+          recordFailure();
           console.error('[TradingView] JSON parse error, raw:', data.substring(0, 200));
-          reject(new Error('JSON parse hatası'));
+          reject(new Error('JSON parse hatasi'));
         }
       });
     });
 
-    req.on('error', reject);
+    req.on('error', (err: Error) => { recordFailure(); reject(err); });
     req.setTimeout(10000, () => {
       req.destroy();
+      recordFailure();
       reject(new Error('Timeout'));
     });
     req.write(bodyStr);

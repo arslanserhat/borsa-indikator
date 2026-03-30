@@ -41,10 +41,16 @@ export function getPortfolio(): PortfolioEntry[] {
 }
 
 export function addToPortfolio(entry: Omit<PortfolioEntry, 'addedAt'>): PortfolioEntry[] {
+  if (entry.quantity <= 0 || entry.avgCost <= 0) return getPortfolio();
   const list = getPortfolio();
   const existing = list.find(p => p.symbol === entry.symbol);
   if (existing) {
     const totalQty = existing.quantity + entry.quantity;
+    if (totalQty <= 0) {
+      const filtered = list.filter(p => p.symbol !== entry.symbol);
+      localStorage.setItem(PORTFOLIO_KEY, JSON.stringify(filtered));
+      return filtered;
+    }
     existing.avgCost = ((existing.avgCost * existing.quantity) + (entry.avgCost * entry.quantity)) / totalQty;
     existing.quantity = totalQty;
   } else {
