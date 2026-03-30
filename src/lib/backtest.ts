@@ -136,7 +136,7 @@ export async function runBacktest(symbol: string, days: number = 750): Promise<B
   for (let i = 0; i < signals.length; i++) {
     const { score, price, date } = signals[i];
 
-    if (!inPosition && score >= 58) {
+    if (!inPosition && score >= 60) {
       // AL sinyali
       inPosition = true;
       entryPrice = price;

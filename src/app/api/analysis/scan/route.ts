@@ -152,5 +152,33 @@ async function runScan(): Promise<any[]> {
   results.sort((a, b) => b.score - a.score);
   await cacheScan(results);
   lastScanTime = Date.now();
+
+  // Paper Trading: AL/GUCLU_AL sinyali veren hisseleri otomatik kaydet
+  try {
+    const buySignals = results.filter(r => r.signal === 'AL' || r.signal === 'GUCLU_AL');
+    if (buySignals.length > 0) {
+      const trades = buySignals.map(r => ({
+        symbol: r.symbol, signal: r.signal, score: r.score,
+        confidence: r.confidence, price: r.price,
+      }));
+      // Internal fetch yerine dogrudan DB'ye yaz
+      const pool = (await import('@/lib/db')).default;
+      for (const t of trades.slice(0, 20)) { // Max 20 kayit/tarama
+        const exists = await pool.query(
+          'SELECT id FROM paper_trades WHERE symbol = $1 AND created_at > CURRENT_DATE', [t.symbol]
+        );
+        if (exists.rows.length > 0) continue;
+        await pool.query(
+          `INSERT INTO paper_trades (symbol, signal, signal_score, confidence, entry_price, stop_loss, target_price)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [t.symbol, t.signal, t.score, t.confidence, t.price, t.price * 0.95, t.price * 1.08]
+        );
+      }
+      console.log(`[PaperTrade] ${Math.min(buySignals.length, 20)} sanal islem kaydedildi`);
+    }
+  } catch (err) {
+    console.error('[PaperTrade] Kayit hatasi:', err);
+  }
+
   return results;
 }

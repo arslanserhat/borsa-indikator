@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { useAnalysis } from '@/hooks/useAnalysis';
 import { AnalysisResult, ScoreBreakdown, CandlestickPattern, NewsSentiment } from '@/types/analysis';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -14,6 +15,13 @@ export default function AnalysisPage() {
   const sym = (symbol as string || '').toUpperCase();
   const { analysis, loading, error } = useAnalysis(sym);
   const isMobile = useIsMobile();
+  const [paperStats, setPaperStats] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/paper-trades').then(r => r.json()).then(d => {
+      if (d.stats) setPaperStats(d.stats);
+    }).catch(() => {});
+  }, []);
 
   if (loading) return <LoadingSkeleton />;
   if (error || !analysis) return (
@@ -99,6 +107,49 @@ export default function AnalysisPage() {
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
             Volatilite: %{analysis.volatility}
           </div>
+        </div>
+      </div>
+
+      {/* C3: Basari Orani + Veri Kaynagi Uyarisi */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        {paperStats && paperStats.checked1d > 0 && (
+          <div style={{
+            flex: 1, minWidth: '200px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)', padding: '14px 18px',
+            display: 'flex', alignItems: 'center', gap: '14px',
+          }}>
+            <div style={{
+              width: '48px', height: '48px', borderRadius: '50%',
+              backgroundColor: (paperStats.winRate1d || 0) >= 60 ? 'var(--green-bg)' : (paperStats.winRate1d || 0) >= 45 ? 'var(--accent-bg)' : 'var(--red-bg)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '16px', fontWeight: '800',
+              color: (paperStats.winRate1d || 0) >= 60 ? 'var(--green)' : (paperStats.winRate1d || 0) >= 45 ? 'var(--accent)' : 'var(--red)',
+            }}>
+              %{paperStats.winRate1d || 0}
+            </div>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                Analiz Basari Orani (1 Gun)
+              </div>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                Son 30 gun: {paperStats.wins1d}W / {paperStats.losses1d}L ({paperStats.checked1d} islem)
+                {paperStats.winRate3d !== null && ` | 3 Gun: %${paperStats.winRate3d}`}
+              </div>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                Ort. Getiri: 1G %{paperStats.avgPnl1d} | 3G %{paperStats.avgPnl3d}
+              </div>
+            </div>
+          </div>
+        )}
+        <div style={{
+          flex: 1, minWidth: '200px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)', padding: '14px 18px',
+          fontSize: '11px', color: 'var(--text-muted)', lineHeight: '1.6',
+        }}>
+          <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--accent)', letterSpacing: '0.5px', marginBottom: '4px' }}>
+            VERI KAYNAGI
+          </div>
+          Veriler TradingView Scanner API'den alinmaktadir. Snapshot zamanlama farki nedeniyle TradingView web sitesiyle 1-3 puan fark olabilir. Bu yatirim tavsiyesi degildir.
         </div>
       </div>
 

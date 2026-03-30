@@ -196,16 +196,20 @@ export function analyzeSentiment(newsItems: NewsItem[]): NewsSentiment[] {
       if (text.includes(bigram)) { score += val; keywords.push('+' + bigram); }
     }
 
-    // 2. Sonra tekil kelimeleri kontrol et (bigram'da yakalanamayanlar)
-    // Bigram'da zaten yakalanan kelimeleri tekrar saymamak için kontrol
-    const bigramText = [...Object.keys(NEGATIVE_BIGRAMS), ...Object.keys(POSITIVE_BIGRAMS)]
-      .filter(b => text.includes(b)).join(' ');
+    // 2. Bigram'larda gecen tum kelimeleri topla (tekil aramadan cikar)
+    const matchedBigrams = [...Object.keys(NEGATIVE_BIGRAMS), ...Object.keys(POSITIVE_BIGRAMS)]
+      .filter(b => text.includes(b));
+    const bigramWords = new Set<string>();
+    for (const bg of matchedBigrams) {
+      for (const w of bg.split(' ')) bigramWords.add(w);
+    }
 
+    // 3. Tekil kelimeleri kontrol et (bigram'da yakalananlar HARIC)
     for (const [word, val] of Object.entries(POSITIVE_WORDS)) {
-      if (text.includes(word) && !bigramText.includes(word)) { score += val; keywords.push('+' + word); }
+      if (text.includes(word) && !bigramWords.has(word)) { score += val; keywords.push('+' + word); }
     }
     for (const [word, val] of Object.entries(NEGATIVE_WORDS)) {
-      if (text.includes(word) && !bigramText.includes(word)) { score += val; keywords.push(word); }
+      if (text.includes(word) && !bigramWords.has(word)) { score += val; keywords.push(word); }
     }
 
     if (item.source === 'kap' && score === 0) score = 0.05;
@@ -489,10 +493,12 @@ function calculateCompositeFromSignals(signals: IndividualSignal[]): {
 }
 
 function determineSignal(score: number): { signal: Signal; signalText: string } {
-  if (score >= 70) return { signal: 'GUCLU_AL', signalText: 'GUCLU AL' };
-  if (score >= 58) return { signal: 'AL', signalText: 'AL' };
-  if (score >= 42) return { signal: 'NOTR', signalText: 'NOTR' };
-  if (score >= 30) return { signal: 'SAT', signalText: 'SAT' };
+  // NOTR bolgesi genisletildi (eski: 42-57=15 puan, yeni: 40-59=20 puan)
+  // Kenar durumlarinda yanlis sinyal riski azaltildi
+  if (score >= 72) return { signal: 'GUCLU_AL', signalText: 'GUCLU AL' };
+  if (score >= 60) return { signal: 'AL', signalText: 'AL' };
+  if (score >= 40) return { signal: 'NOTR', signalText: 'NOTR' };
+  if (score >= 28) return { signal: 'SAT', signalText: 'SAT' };
   return { signal: 'GUCLU_SAT', signalText: 'GUCLU SAT' };
 }
 
@@ -502,13 +508,15 @@ function calculateConfidence(signals: IndividualSignal[], composite: number): nu
   const total = signals.length;
   const alignmentRatio = aligned / total;
 
-  // Güçlü sinyallerin sayısı
   const strongSignals = signals.filter(s => Math.abs(s.signal) > 0.5).length;
+  // Notr sinyaller de sayilsin (kararsizlik = dusuk guven degil)
+  const neutralSignals = signals.filter(s => Math.abs(s.signal) <= 0.1).length;
 
-  const base = Math.round(alignmentRatio * 70);
-  const bonus = Math.min(25, strongSignals * 5);
+  const base = Math.round(alignmentRatio * 60 + 15); // Min 15 base
+  const bonus = Math.min(20, strongSignals * 4);
+  const neutralPenalty = Math.min(10, neutralSignals * 2);
 
-  return Math.min(95, Math.max(20, base + bonus));
+  return Math.min(95, Math.max(30, base + bonus - neutralPenalty));
 }
 
 function calculateSentimentScore(avg: number): number {
@@ -519,7 +527,8 @@ function calculateCandlestickScore(patterns: CandlestickPattern[]): number {
   let score = 50;
   for (const p of patterns) {
     if (p.barIndex > 5) continue;
-    const impact = p.strength === 3 ? 18 : p.strength === 2 ? 12 : 6;
+    // Impact sinirlandirildi: tek formasyon max 12 puan (eskisi 18)
+    const impact = p.strength === 3 ? 12 : p.strength === 2 ? 8 : 4;
     if (p.type === 'bullish') score += impact;
     else if (p.type === 'bearish') score -= impact;
   }

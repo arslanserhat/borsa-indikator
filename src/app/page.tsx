@@ -19,6 +19,13 @@ export default function Dashboard() {
 
   const isMobile = useIsMobile();
   const { alerts, permissionGranted, soundEnabled, setSoundEnabled, requestPermission, checkPriceAlerts } = usePortfolioAlerts();
+  const [paperStats, setPaperStats] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/paper-trades').then(r => r.json()).then(d => {
+      if (d.stats) setPaperStats(d.stats);
+    }).catch(() => {});
+  }, []);
 
   // ANLIK portfolio kontrolu - her stock guncellenmesinde (5sn)
   useEffect(() => {
@@ -82,6 +89,17 @@ export default function Dashboard() {
             <div style={{ fontSize: '10px', color: 'var(--text-muted)', backgroundColor: 'var(--bg-card)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
               {scanData.length} hisse tarandi
             </div>
+            {paperStats && paperStats.checked1d > 0 && (
+              <div style={{
+                fontSize: '10px', padding: '6px 12px', borderRadius: 'var(--radius-sm)',
+                backgroundColor: (paperStats.winRate1d || 0) >= 60 ? 'var(--green-bg)' : 'var(--accent-bg)',
+                border: `1px solid ${(paperStats.winRate1d || 0) >= 60 ? 'rgba(0,216,151,0.2)' : 'rgba(247,147,26,0.2)'}`,
+                color: (paperStats.winRate1d || 0) >= 60 ? 'var(--green)' : 'var(--accent)',
+                fontWeight: '600',
+              }}>
+                Basari: %{paperStats.winRate1d} ({paperStats.checked1d} islem)
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -37,7 +37,7 @@ export function filterAndPrioritizeOrders(
   }
 
   // 1. Sadece AL sinyali olanları filtrele (skor >= 58)
-  const buySignals = orders.filter(o => o.score >= 58 && (o.signal === 'AL' || o.signal === 'GUCLU_AL'));
+  const buySignals = orders.filter(o => o.score >= 60 && (o.signal === 'AL' || o.signal === 'GUCLU_AL'));
   const nonBuy = orders.filter(o => o.score < 58 || (o.signal !== 'AL' && o.signal !== 'GUCLU_AL'));
 
   // 2. Skora göre sırala (en yüksek önce)

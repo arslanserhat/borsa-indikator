@@ -51,16 +51,16 @@ export async function getMarketFilter(): Promise<MarketState> {
 
     if (bist100Change <= -3) {
       marketMode = 'crash';
-      scoreAdjustment = -15;
-      message = `CRASH MODU: BIST100 %${bist100Change.toFixed(2)} dususte! Tum AL sinyalleri askiya alindi. Yeni pozisyon ACMAYIN.`;
+      scoreAdjustment = -10; // Eski: -15 (cok agresifti, NOTR bolgesini asiyordu)
+      message = `CRASH MODU: BIST100 %${bist100Change.toFixed(2)} dususte! Yeni pozisyon ACMAYIN.`;
     } else if (bist100Change <= -2) {
       marketMode = 'panic';
-      scoreAdjustment = -10;
-      message = `PANIK: BIST100 %${bist100Change.toFixed(2)} dususte. AL sinyalleri zayiflatildi. Dikkatli olun.`;
+      scoreAdjustment = -7; // Eski: -10
+      message = `PANIK: BIST100 %${bist100Change.toFixed(2)} dususte. AL sinyalleri zayiflatildi.`;
     } else if (bist100Change <= -1 || usdTryChange >= 2) {
       marketMode = 'caution';
-      scoreAdjustment = -5;
-      message = `DIKKAT: ${bist100Change < -1 ? 'BIST100 %' + bist100Change.toFixed(2) + ' dususte' : 'Dolar %' + usdTryChange.toFixed(2) + ' yukseldi'}. AL sinyalleri hafif zayiflatildi.`;
+      scoreAdjustment = -3; // Eski: -5
+      message = `DIKKAT: ${bist100Change < -1 ? 'BIST100 %' + bist100Change.toFixed(2) + ' dususte' : 'Dolar %' + usdTryChange.toFixed(2) + ' yukseldi'}.`;
     } else {
       message = 'Piyasa normal. Sinyaller tam guvenilir.';
     }

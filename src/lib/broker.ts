@@ -56,11 +56,11 @@ export function checkOrderRisk(
   if (order.side === 'BUY' && openPositionCount >= 10) {
     return { approved: false, reason: 'Max acik pozisyon limiti (10) doldu', maxQuantity: 0, maxRiskTL: 0 };
   }
-  if (order.side === 'BUY' && order.signalScore < 58) {
-    return { approved: false, reason: `Sinyal skoru (${order.signalScore}) AL esigi (58) altinda`, maxQuantity: 0, maxRiskTL: 0 };
+  if (order.side === 'BUY' && order.signalScore < 60) {
+    return { approved: false, reason: `Sinyal skoru (${order.signalScore}) AL esigi (60) altinda`, maxQuantity: 0, maxRiskTL: 0 };
   }
-  if (order.side === 'SELL' && order.signalScore > 42) {
-    return { approved: false, reason: `Sinyal skoru (${order.signalScore}) SAT esigi (42) ustunde`, maxQuantity: 0, maxRiskTL: 0 };
+  if (order.side === 'SELL' && order.signalScore > 40) {
+    return { approved: false, reason: `Sinyal skoru (${order.signalScore}) SAT esigi (40) ustunde`, maxQuantity: 0, maxRiskTL: 0 };
   }
 
   const riskPerTrade = order.stopLoss
