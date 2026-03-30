@@ -1,37 +1,23 @@
 import { NextResponse } from 'next/server';
+import { fetchStockIndicators } from '@/lib/tradingview';
 
 export const dynamic = 'force-dynamic';
 
-const SCANNER_URL = 'https://scanner.tradingview.com/turkey/scan';
+const COLUMNS = [
+  'name', 'close', 'change', 'change_abs', 'high', 'low',
+  'volume', 'open', 'description', 'prev_close_price',
+  'bid', 'ask', 'market_cap_basic', 'price_earnings_ttm',
+  'Recommend.All', 'RSI', 'MACD.macd', 'ADX',
+];
 
 export async function GET(
   request: Request,
   { params }: { params: { symbol: string } }
 ) {
   try {
-    const body = JSON.stringify({
-      symbols: { tickers: [`BIST:${params.symbol}`] },
-      columns: [
-        'name', 'close', 'change', 'change_abs', 'high', 'low',
-        'volume', 'open', 'description', 'prev_close_price',
-        'bid', 'ask', 'market_cap_basic', 'price_earnings_ttm',
-        'Recommend.All', 'RSI', 'MACD.macd', 'ADX',
-      ],
-    });
+    const d = await fetchStockIndicators(params.symbol, COLUMNS);
+    if (!d) return NextResponse.json({ error: 'Hisse bulunamadi' }, { status: 404 });
 
-    const res = await fetch(SCANNER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-    });
-
-    if (!res.ok) throw new Error(`TradingView error: ${res.status}`);
-
-    const data = await res.json();
-    const item = data?.data?.[0];
-    if (!item) return NextResponse.json({ error: 'Hisse bulunamadı' }, { status: 404 });
-
-    const d = item.d;
     return NextResponse.json({
       data: {
         kod: d[0],
@@ -58,6 +44,6 @@ export async function GET(
     });
   } catch (error) {
     console.error('Hisse detay hata:', error);
-    return NextResponse.json({ error: 'Veri alınamadı' }, { status: 500 });
+    return NextResponse.json({ error: 'Veri alinamadi' }, { status: 500 });
   }
 }
