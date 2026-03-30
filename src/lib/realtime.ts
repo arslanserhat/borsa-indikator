@@ -1,12 +1,9 @@
 /**
- * GERCEK ZAMANLI VERI - TradingView WebSocket + SSE
+ * GERCEK ZAMANLI VERI - Server-Side Fast Polling + SSE
  *
- * Mimari:
- * 1. TradingView WebSocket'e baglan (@mathieuc/tradingview)
- * 2. Fiyat degisikliklerini hafizada tut
- * 3. SSE ile browser'a aktar (aninda, polling degil)
- *
- * Tek bir WebSocket baglantisi tum client'lara hizmet eder.
+ * TradingView WebSocket (@mathieuc/tradingview) Next.js'de stabil calismiyor.
+ * Cozum: Server-side 2sn polling + SSE ile browser'a aktarim.
+ * Tek bir polling loop tum subscriber'lara hizmet eder.
  */
 
 import { fetchStockIndicators } from './tradingview';
@@ -25,116 +22,87 @@ export interface RealtimeUpdate {
 // === GLOBAL STATE ===
 const priceStore = new Map<string, RealtimeUpdate>();
 const subscribers = new Map<string, Set<(data: RealtimeUpdate) => void>>();
-let wsClient: any = null;
-let wsConnecting = false;
-const activeCharts = new Map<string, any>();
+let pollingActive = false;
+const activeSymbols = new Set<string>();
 
-// === WEBSOCKET BAGLANTISI ===
+// === SERVER-SIDE POLLING ===
 
-async function ensureWSConnection(): Promise<any> {
-  if (wsClient) return wsClient;
-  if (wsConnecting) {
-    // Baglanti kuruluyor, bekle
-    return new Promise((resolve) => {
-      const check = setInterval(() => {
-        if (wsClient) { clearInterval(check); resolve(wsClient); }
-      }, 100);
-      setTimeout(() => { clearInterval(check); resolve(null); }, 10000);
-    });
-  }
-
-  wsConnecting = true;
+async function pollSymbol(symbol: string): Promise<void> {
   try {
-    const TV = require('@mathieuc/tradingview');
-    const client = new TV.Client();
-    wsClient = client;
-    wsConnecting = false;
-    console.log('[WS] TradingView WebSocket baglandi');
-    return client;
-  } catch (err) {
-    wsConnecting = false;
-    console.error('[WS] Baglanti hatasi:', err);
-    return null;
-  }
-}
+    const d = await fetchStockIndicators(symbol, [
+      'name', 'close', 'change', 'change_abs', 'volume', 'high', 'low',
+    ]);
+    if (!d || !d[1]) return;
 
-// Sembol icin WebSocket stream baslat
-async function subscribeSymbol(symbol: string): Promise<void> {
-  if (activeCharts.has(symbol)) return; // Zaten dinleniyor
+    const update: RealtimeUpdate = {
+      symbol,
+      price: d[1],
+      change: d[3] || 0,
+      changePercent: d[2] || 0,
+      volume: d[4] || 0,
+      high: d[5] || d[1],
+      low: d[6] || d[1],
+      timestamp: Date.now(),
+    };
 
-  const client = await ensureWSConnection();
-  if (!client) return;
+    const prev = priceStore.get(symbol);
+    // Sadece fiyat degistiyse bildir (gereksiz traffic onleme)
+    const changed = !prev || prev.price !== update.price || prev.volume !== update.volume;
 
-  try {
-    const chart = new client.Session.Chart();
-    chart.setMarket(`BIST:${symbol}`, { timeframe: '1', range: 1 });
+    priceStore.set(symbol, update);
 
-    chart.onUpdate(() => {
-      try {
-        const periods = chart.periods || [];
-        if (periods.length === 0) return;
-
-        const latest = periods[0]; // En son mum
-        const price = latest.close || 0;
-        if (price <= 0) return;
-
-        const prev = priceStore.get(symbol);
-        const update: RealtimeUpdate = {
-          symbol,
-          price,
-          change: latest.close - (latest.open || latest.close),
-          changePercent: prev ? ((price - (prev.price || price)) / (prev.price || price)) * 100 : 0,
-          volume: latest.volume || 0,
-          high: latest.max || price,
-          low: latest.min || price,
-          timestamp: Date.now(),
-        };
-
-        priceStore.set(symbol, update);
-
-        // Tum subscriber'lara bildir
-        const subs = subscribers.get(symbol);
-        if (subs) {
-          for (const cb of subs) {
-            try { cb(update); } catch {}
-          }
+    if (changed) {
+      const subs = subscribers.get(symbol);
+      if (subs) {
+        for (const cb of subs) {
+          try { cb(update); } catch {}
         }
-      } catch {}
-    });
+      }
+    }
+  } catch {}
+}
 
-    chart.onError((err: any) => {
-      console.error(`[WS] ${symbol} chart error:`, err);
-      activeCharts.delete(symbol);
-    });
+// Tum aktif sembolleri poll et
+async function pollAll(): Promise<void> {
+  const symbols = [...activeSymbols];
+  if (symbols.length === 0) return;
 
-    activeCharts.set(symbol, chart);
-    console.log(`[WS] ${symbol} stream basladi`);
-  } catch (err) {
-    console.error(`[WS] ${symbol} subscribe hatasi:`, err);
+  // 3'erli batch - rate limit onleme
+  const BATCH = 3;
+  for (let i = 0; i < symbols.length; i += BATCH) {
+    const batch = symbols.slice(i, i + BATCH);
+    await Promise.all(batch.map(pollSymbol));
   }
 }
 
-// Sembol dinlemeyi birak
-function unsubscribeSymbol(symbol: string): void {
-  const chart = activeCharts.get(symbol);
-  if (chart) {
-    try { chart.delete(); } catch {}
-    activeCharts.delete(symbol);
-    console.log(`[WS] ${symbol} stream durduruldu`);
-  }
+// Polling loop baslat
+function startPollingLoop(): void {
+  if (pollingActive) return;
+  pollingActive = true;
+
+  const loop = async () => {
+    while (pollingActive && activeSymbols.size > 0) {
+      await pollAll();
+      // 2sn bekle - TradingView rate limit'e takilmamak icin
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    pollingActive = false;
+  };
+
+  loop().catch(() => { pollingActive = false; });
 }
 
 // === PUBLIC API ===
 
-// SSE subscriber ekle
 export function addSubscriber(symbol: string, callback: (data: RealtimeUpdate) => void): () => void {
   if (!subscribers.has(symbol)) {
     subscribers.set(symbol, new Set());
   }
   subscribers.get(symbol)!.add(callback);
+  activeSymbols.add(symbol);
 
-  // WebSocket stream baslat (yoksa)
-  subscribeSymbol(symbol);
+  // Polling loop baslat (yoksa)
+  startPollingLoop();
 
   // Son bilinen fiyati hemen gonder
   const cached = priceStore.get(symbol);
@@ -142,18 +110,17 @@ export function addSubscriber(symbol: string, callback: (data: RealtimeUpdate) =
     try { callback(cached); } catch {}
   }
 
-  // Unsubscribe fonksiyonu don
+  // Unsubscribe fonksiyonu
   return () => {
     const subs = subscribers.get(symbol);
     if (subs) {
       subs.delete(callback);
-      // Dinleyen kalmadiysa WebSocket'i kapat
       if (subs.size === 0) {
         subscribers.delete(symbol);
-        // 30sn sonra hala dinleyen yoksa kapat (reconnect onleme)
+        // 30sn sonra hala dinleyen yoksa sembolü kaldır
         setTimeout(() => {
           if (!subscribers.has(symbol) || subscribers.get(symbol)!.size === 0) {
-            unsubscribeSymbol(symbol);
+            activeSymbols.delete(symbol);
           }
         }, 30000);
       }
@@ -161,12 +128,11 @@ export function addSubscriber(symbol: string, callback: (data: RealtimeUpdate) =
   };
 }
 
-// Mevcut fiyati al (cache)
 export function getCachedPrice(symbol: string): RealtimeUpdate | null {
   return priceStore.get(symbol) || null;
 }
 
-// Fallback: HTTP polling ile fiyat cek (WebSocket basarisiz olursa)
+// Fallback: tek seferlik fiyat cek
 export async function fetchRealtimePrices(symbols: string[]): Promise<RealtimeUpdate[]> {
   const updates: RealtimeUpdate[] = [];
   const BATCH = 5;
@@ -174,7 +140,6 @@ export async function fetchRealtimePrices(symbols: string[]): Promise<RealtimeUp
   for (let i = 0; i < symbols.length; i += BATCH) {
     const batch = symbols.slice(i, i + BATCH);
     const promises = batch.map(async (sym) => {
-      // Once cache kontrol
       const cached = priceStore.get(sym);
       if (cached && Date.now() - cached.timestamp < 5000) return cached;
 
@@ -194,15 +159,13 @@ export async function fetchRealtimePrices(symbols: string[]): Promise<RealtimeUp
     });
     updates.push(...(await Promise.all(promises)).filter(Boolean) as RealtimeUpdate[]);
   }
-
   return updates;
 }
 
-// Aktif baglanti durumu
-export function getWSStatus(): { connected: boolean; activeSymbols: string[]; subscriberCount: number } {
+export function getWSStatus() {
   return {
-    connected: wsClient !== null,
-    activeSymbols: [...activeCharts.keys()],
+    connected: pollingActive,
+    activeSymbols: [...activeSymbols],
     subscriberCount: [...subscribers.values()].reduce((sum, s) => sum + s.size, 0),
   };
 }
