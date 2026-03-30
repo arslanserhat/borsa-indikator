@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 const COLUMNS = [
   'name', 'close', 'change', 'change_abs', 'high', 'low',
   'volume', 'open', 'description',
-  'bid', 'ask', 'market_cap_basic', 'price_earnings_ttm',
+  'market_cap_basic', 'price_earnings_ttm',
   'Recommend.All', 'RSI', 'MACD.macd', 'ADX',
 ];
 
@@ -19,8 +19,8 @@ export async function GET(
     if (!d) return NextResponse.json({ error: 'Hisse bulunamadi' }, { status: 404 });
 
     // Columns: name(0), close(1), change(2), change_abs(3), high(4), low(5),
-    //          volume(6), open(7), description(8), bid(9), ask(10),
-    //          market_cap(11), pe(12), rec(13), rsi(14), macd(15), adx(16)
+    //          volume(6), open(7), description(8),
+    //          market_cap(9), pe(10), rec(11), rsi(12), macd(13), adx(14)
     const oncekiKapanis = (d[1] || 0) - (d[3] || 0);
     return NextResponse.json({
       data: {
@@ -34,14 +34,14 @@ export async function GET(
         acilis: d[7],
         ad: d[8],
         oncekiKapanis,
-        alis: d[9],
-        satis: d[10],
-        piyasaDegeri: d[11],
-        fk: d[12],
-        oneri: d[13],
-        rsi: d[14],
-        macd: d[15],
-        adx: d[16],
+        alis: 0,
+        satis: 0,
+        piyasaDegeri: d[9],
+        fk: d[10],
+        oneri: d[11],
+        rsi: d[12],
+        macd: d[13],
+        adx: d[14],
       },
       source: 'TradingView',
       timestamp: Date.now(),
