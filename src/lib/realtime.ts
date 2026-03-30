@@ -159,7 +159,7 @@ async function connect(): Promise<void> {
       }, 3000);
     });
 
-    ws.on('error', (err) => {
+    ws.on('error', (err: any) => {
       wsConnecting = false;
       console.error('[WS] Hata:', err.message);
     });
