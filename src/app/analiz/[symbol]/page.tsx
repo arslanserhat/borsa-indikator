@@ -34,49 +34,39 @@ export default function AnalysisPage() {
   const sigColor = SIGNAL_COLORS[analysis.signal] || 'var(--text-muted)';
 
   return (
-    <div style={{ maxWidth: '1200px' }}>
-      {/* KOMPAKT HEADER: Sembol + Fiyat + Sinyal + Risk tek satirda */}
+    <div>
+      {/* HEADER: Gauge + Sinyal + Metrikler */}
       <div style={{
         backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)',
         borderRadius: 'var(--radius)', padding: '16px 20px', marginBottom: '10px',
-        display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap',
+        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'auto 1fr auto', gap: '20px', alignItems: 'center',
       }}>
-        {/* Sol: Sembol + Fiyat */}
-        <div style={{ flex: '0 0 auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <h1 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '-0.3px', margin: 0 }}>{sym}</h1>
+        {/* Sol: Gauge + Sembol */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <ScoreGauge score={analysis.compositeScore} color={sigColor} />
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h1 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '-0.3px', margin: 0 }}>{sym}</h1>
+              <span style={{
+                fontSize: '10px', fontWeight: '700', letterSpacing: '0.5px',
+                color: analysis.signal.includes('AL') ? '#000' : '#fff',
+                backgroundColor: sigColor, padding: '2px 8px', borderRadius: '3px',
+              }}>{analysis.signalText}</span>
+            </div>
             <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{analysis.name}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '2px' }}>
-            <span style={{ fontSize: '22px', fontWeight: '700', fontVariantNumeric: 'tabular-nums' }}>
-              {analysis.price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
-            </span>
-            <span style={{ fontSize: '12px', fontWeight: '600', color: analysis.changePercent >= 0 ? 'var(--green)' : 'var(--red)' }}>
-              {analysis.changePercent >= 0 ? '+' : ''}{analysis.changePercent.toFixed(2)}%
-            </span>
-          </div>
-        </div>
-
-        {/* Dikey ayirici */}
-        <div style={{ width: '1px', height: '40px', backgroundColor: 'var(--border)' }} />
-
-        {/* Sinyal Badge */}
-        <div style={{ flex: '0 0 auto', textAlign: 'center' }}>
-          <div style={{
-            fontSize: '24px', fontWeight: '800', color: sigColor,
-            letterSpacing: '1px',
-          }}>
-            {analysis.signalText}
-          </div>
-          <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-            Skor: <span style={{ fontWeight: '700', color: sigColor }}>{analysis.compositeScore}</span>/100
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '2px' }}>
+              <span style={{ fontSize: '22px', fontWeight: '700', fontVariantNumeric: 'tabular-nums' }}>
+                {analysis.price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+              </span>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: analysis.changePercent >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                {analysis.changePercent >= 0 ? '+' : ''}{analysis.changePercent.toFixed(2)}%
+              </span>
+            </div>
           </div>
         </div>
 
-        <div style={{ width: '1px', height: '40px', backgroundColor: 'var(--border)' }} />
-
-        {/* Mini metrikler */}
-        <div style={{ display: 'flex', gap: '14px', flex: 1 }}>
+        {/* Orta: Metrikler */}
+        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
           {[
             { label: 'Guven', value: `%${analysis.confidence}`, color: sigColor },
             { label: 'Risk', value: analysis.riskLevel === 'dusuk' ? 'DUSUK' : analysis.riskLevel === 'orta' ? 'ORTA' : 'YUKSEK',
@@ -87,15 +77,15 @@ export default function AnalysisPage() {
           ].map(m => (
             <div key={m.label} style={{ textAlign: 'center', minWidth: '50px' }}>
               <div style={{ fontSize: '9px', color: 'var(--text-muted)', letterSpacing: '0.3px' }}>{m.label}</div>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: m.color }}>{m.value}</div>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: m.color }}>{m.value}</div>
             </div>
           ))}
         </div>
 
-        {/* Grafik linki */}
+        {/* Sag: Grafik linki */}
         <a href={`/chart/${sym}`} style={{
-          fontSize: '10px', color: 'var(--blue)', textDecoration: 'none',
-          padding: '6px 12px', border: '1px solid var(--blue)', borderRadius: '4px', fontWeight: '600',
+          fontSize: '11px', color: 'var(--blue)', textDecoration: 'none',
+          padding: '8px 14px', border: '1px solid var(--blue)', borderRadius: '4px', fontWeight: '600',
         }}>
           Grafik
         </a>
@@ -600,7 +590,7 @@ function SentimentPanel({ items, avg }: { items: NewsSentiment[]; avg: number })
 
 function LoadingSkeleton() {
   return (
-    <div style={{ maxWidth: '1200px' }}>
+    <div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ height: '32px', width: '200px', backgroundColor: 'var(--bg-card)', borderRadius: '6px', animation: 'ld 1.5s ease-in-out infinite' }} />
         <div style={{ height: '180px', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius)', animation: 'ld 1.5s ease-in-out infinite' }} />
