@@ -22,6 +22,8 @@ export default function PortfolioPage() {
   const [editQty, setEditQty] = useState('');
   const [editCost, setEditCost] = useState('');
   const [editMode, setEditMode] = useState<'buy' | 'sell'>('buy');
+  const [symbolSearch, setSymbolSearch] = useState<any[]>([]);
+  const [selectedStock, setSelectedStock] = useState<any>(null);
   const isMobile = useIsMobile();
 
   // DB'den portföy çek
@@ -177,16 +179,87 @@ export default function PortfolioPage() {
         <div style={{
           backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)',
           borderRadius: 'var(--radius)', padding: '16px', marginBottom: '16px',
-          display: 'flex', gap: '10px', alignItems: 'end',
         }}>
-          {[
-            { label: 'Sembol', val: newSymbol, set: setNewSymbol, ph: 'THYAO', type: 'text' },
-            { label: 'Adet', val: newQty, set: setNewQty, ph: '100', type: 'number' },
-            { label: 'Ortalama Maliyet', val: newCost, set: setNewCost, ph: '250.50', type: 'number' },
-          ].map(({ label, val, set, ph, type }) => (
-            <div key={label}>
-              <label style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', letterSpacing: '0.3px' }}>{label}</label>
-              <input value={val} onChange={e => set(e.target.value)} placeholder={ph} type={type} step="0.01" style={{
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'end', flexWrap: 'wrap' }}>
+            {/* Sembol - arama ile */}
+            <div style={{ position: 'relative' }}>
+              <label style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', letterSpacing: '0.3px' }}>Sembol</label>
+              <input value={newSymbol} placeholder="Ara... THYAO, GARAN" type="text"
+                onChange={e => {
+                  const val = e.target.value.toUpperCase();
+                  setNewSymbol(val);
+                  setSelectedStock(null);
+                  if (val.length >= 2) {
+                    setSymbolSearch(stocks.filter(s => s.kod.includes(val) || s.ad.toLowerCase().includes(val.toLowerCase())).slice(0, 6));
+                  } else {
+                    setSymbolSearch([]);
+                  }
+                }}
+                style={{
+                  backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-sm)', padding: '8px 12px', color: 'var(--text-primary)',
+                  fontSize: '12px', width: '200px', outline: 'none',
+                }}
+                onFocus={(e) => (e.target.style.borderColor = 'var(--accent)')}
+                onBlur={(e) => { setTimeout(() => setSymbolSearch([]), 200); e.target.style.borderColor = 'var(--border)'; }}
+              />
+              {/* Arama sonuclari dropdown */}
+              {symbolSearch.length > 0 && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                  backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-sm)', overflow: 'hidden', marginTop: '4px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                }}>
+                  {symbolSearch.map(s => (
+                    <div key={s.kod} onClick={() => {
+                      setNewSymbol(s.kod);
+                      setSelectedStock(s);
+                      setNewCost(s.fiyat.toFixed(2));
+                      setSymbolSearch([]);
+                    }} style={{
+                      padding: '8px 12px', cursor: 'pointer', fontSize: '11px',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      borderBottom: '1px solid var(--border)',
+                    }}
+                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--bg-hover)')}
+                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <div>
+                        <span style={{ fontWeight: '700', color: 'var(--blue)' }}>{s.kod}</span>
+                        <span style={{ color: 'var(--text-muted)', marginLeft: '8px', fontSize: '10px' }}>{s.ad}</span>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontWeight: '600', fontVariantNumeric: 'tabular-nums' }}>{s.fiyat.toFixed(2)}</span>
+                        <span style={{ marginLeft: '6px', fontSize: '10px', color: s.degisimYuzde >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                          {s.degisimYuzde >= 0 ? '+' : ''}{s.degisimYuzde.toFixed(2)}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Adet */}
+            <div>
+              <label style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', letterSpacing: '0.3px' }}>Adet</label>
+              <input value={newQty} onChange={e => setNewQty(e.target.value)} placeholder="100" type="number" style={{
+                backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)', padding: '8px 12px', color: 'var(--text-primary)',
+                fontSize: '12px', width: '100px', outline: 'none',
+              }}
+                onFocus={(e) => (e.target.style.borderColor = 'var(--accent)')}
+                onBlur={(e) => (e.target.style.borderColor = 'var(--border)')}
+              />
+            </div>
+
+            {/* Maliyet (otomatik doldurulur) */}
+            <div>
+              <label style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', letterSpacing: '0.3px' }}>
+                Ort. Maliyet {selectedStock && <span style={{ color: 'var(--green)' }}>(Guncel: {selectedStock.fiyat.toFixed(2)} TL)</span>}
+              </label>
+              <input value={newCost} onChange={e => setNewCost(e.target.value)} placeholder="250.50" type="number" step="0.01" style={{
                 backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border)',
                 borderRadius: 'var(--radius-sm)', padding: '8px 12px', color: 'var(--text-primary)',
                 fontSize: '12px', width: '140px', outline: 'none',
@@ -195,14 +268,35 @@ export default function PortfolioPage() {
                 onBlur={(e) => (e.target.style.borderColor = 'var(--border)')}
               />
             </div>
-          ))}
-          <button onClick={handleAdd} style={{
-            backgroundColor: 'var(--green)', border: 'none', color: '#000',
-            padding: '8px 20px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-            fontSize: '11px', fontWeight: '700', height: '36px',
-          }}>
-            Ekle
-          </button>
+
+            <button onClick={handleAdd} style={{
+              backgroundColor: 'var(--green)', border: 'none', color: '#000',
+              padding: '8px 20px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+              fontSize: '11px', fontWeight: '700', height: '36px', alignSelf: 'end',
+            }}>
+              Ekle
+            </button>
+          </div>
+
+          {/* Secilen hisse bilgisi */}
+          {selectedStock && (
+            <div style={{
+              marginTop: '10px', padding: '10px 14px', borderRadius: 'var(--radius-sm)',
+              backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border)',
+              display: 'flex', gap: '16px', alignItems: 'center', fontSize: '11px',
+            }}>
+              <span style={{ fontWeight: '700', color: 'var(--blue)' }}>{selectedStock.kod}</span>
+              <span style={{ color: 'var(--text-muted)' }}>{selectedStock.ad}</span>
+              <span style={{ fontWeight: '700' }}>{selectedStock.fiyat.toFixed(2)} TL</span>
+              <span style={{ color: selectedStock.degisimYuzde >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: '600' }}>
+                {selectedStock.degisimYuzde >= 0 ? '+' : ''}{selectedStock.degisimYuzde.toFixed(2)}%
+              </span>
+              <span style={{ color: 'var(--text-muted)' }}>Hacim: {(selectedStock.hacim / 1e6).toFixed(1)}M</span>
+              {newQty && <span style={{ color: 'var(--accent)', fontWeight: '600' }}>
+                Toplam: {(parseFloat(newQty) * parseFloat(newCost || '0')).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL
+              </span>}
+            </div>
+          )}
         </div>
       )}
 

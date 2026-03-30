@@ -35,149 +35,116 @@ export default function AnalysisPage() {
 
   return (
     <div style={{ maxWidth: '1200px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-            <h1 style={{ fontSize: '24px', fontWeight: '700', letterSpacing: '-0.5px' }}>{sym}</h1>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{analysis.name}</span>
+      {/* KOMPAKT HEADER: Sembol + Fiyat + Sinyal + Risk tek satirda */}
+      <div style={{
+        backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)', padding: '16px 20px', marginBottom: '10px',
+        display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap',
+      }}>
+        {/* Sol: Sembol + Fiyat */}
+        <div style={{ flex: '0 0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '-0.3px', margin: 0 }}>{sym}</h1>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{analysis.name}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-            <span style={{ fontSize: '28px', fontWeight: '700', fontVariantNumeric: 'tabular-nums' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '2px' }}>
+            <span style={{ fontSize: '22px', fontWeight: '700', fontVariantNumeric: 'tabular-nums' }}>
               {analysis.price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
             </span>
-            <span style={{
-              fontSize: '14px', fontWeight: '600',
-              color: analysis.changePercent >= 0 ? 'var(--green)' : 'var(--red)',
-            }}>
+            <span style={{ fontSize: '12px', fontWeight: '600', color: analysis.changePercent >= 0 ? 'var(--green)' : 'var(--red)' }}>
               {analysis.changePercent >= 0 ? '+' : ''}{analysis.changePercent.toFixed(2)}%
             </span>
           </div>
         </div>
-        <a href={`/chart/${sym}`} style={{
-          fontSize: '11px', color: 'var(--text-muted)', textDecoration: 'none',
-          padding: '8px 14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
-        }}>
-          Grafige Git
-        </a>
-      </div>
 
-      {/* Sinyal Banner */}
-      <div style={{
-        backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)', padding: '24px', marginBottom: '16px',
-        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto 1fr', gap: isMobile ? '16px' : '24px', alignItems: 'center', justifyItems: 'center',
-      }}>
-        {/* Sol: Skor */}
-        <div style={{ textAlign: 'center' }}>
-          <ScoreGauge score={analysis.compositeScore} color={sigColor} />
-        </div>
+        {/* Dikey ayirici */}
+        <div style={{ width: '1px', height: '40px', backgroundColor: 'var(--border)' }} />
 
-        {/* Orta: Sinyal */}
-        <div style={{ textAlign: 'center' }}>
+        {/* Sinyal Badge */}
+        <div style={{ flex: '0 0 auto', textAlign: 'center' }}>
           <div style={{
-            fontSize: '32px', fontWeight: '800', color: sigColor,
-            letterSpacing: '2px', marginBottom: '8px',
+            fontSize: '24px', fontWeight: '800', color: sigColor,
+            letterSpacing: '1px',
           }}>
             {analysis.signalText}
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>
-            Guven Orani
-          </div>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px',
-            padding: '4px 14px', borderRadius: 'var(--radius-sm)',
-            backgroundColor: 'var(--bg-hover)',
-          }}>
-            <span style={{ fontSize: '16px', fontWeight: '700', color: sigColor }}>
-              %{analysis.confidence}
-            </span>
+          <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+            Skor: <span style={{ fontWeight: '700', color: sigColor }}>{analysis.compositeScore}</span>/100
           </div>
         </div>
 
-        {/* Sağ: Risk */}
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>Risk Seviyesi</div>
-          <div style={{
-            fontSize: '14px', fontWeight: '600',
-            color: analysis.riskLevel === 'dusuk' ? 'var(--green)' : analysis.riskLevel === 'orta' ? 'var(--accent)' : 'var(--red)',
-          }}>
-            {analysis.riskLevel === 'dusuk' ? 'DUSUK' : analysis.riskLevel === 'orta' ? 'ORTA' : 'YUKSEK'}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Volatilite: %{analysis.volatility}
-          </div>
-        </div>
-      </div>
+        <div style={{ width: '1px', height: '40px', backgroundColor: 'var(--border)' }} />
 
-      {/* C3: Basari Orani + Veri Kaynagi Uyarisi */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        {paperStats && paperStats.checked1d > 0 && (
-          <div style={{
-            flex: 1, minWidth: '200px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)', padding: '14px 18px',
-            display: 'flex', alignItems: 'center', gap: '14px',
-          }}>
-            <div style={{
-              width: '48px', height: '48px', borderRadius: '50%',
-              backgroundColor: (paperStats.winRate1d || 0) >= 60 ? 'var(--green-bg)' : (paperStats.winRate1d || 0) >= 45 ? 'var(--accent-bg)' : 'var(--red-bg)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '16px', fontWeight: '800',
-              color: (paperStats.winRate1d || 0) >= 60 ? 'var(--green)' : (paperStats.winRate1d || 0) >= 45 ? 'var(--accent)' : 'var(--red)',
-            }}>
-              %{paperStats.winRate1d || 0}
+        {/* Mini metrikler */}
+        <div style={{ display: 'flex', gap: '14px', flex: 1 }}>
+          {[
+            { label: 'Guven', value: `%${analysis.confidence}`, color: sigColor },
+            { label: 'Risk', value: analysis.riskLevel === 'dusuk' ? 'DUSUK' : analysis.riskLevel === 'orta' ? 'ORTA' : 'YUKSEK',
+              color: analysis.riskLevel === 'dusuk' ? 'var(--green)' : analysis.riskLevel === 'orta' ? 'var(--accent)' : 'var(--red)' },
+            { label: 'Volatilite', value: `%${analysis.volatility}`, color: 'var(--text-secondary)' },
+            { label: 'RSI', value: analysis.indicators.rsi?.toFixed(0), color: analysis.indicators.rsi < 30 ? 'var(--green)' : analysis.indicators.rsi > 70 ? 'var(--red)' : 'var(--text-secondary)' },
+            { label: 'ADX', value: analysis.indicators.adx?.toFixed(0), color: analysis.indicators.adx > 25 ? 'var(--green)' : 'var(--text-muted)' },
+          ].map(m => (
+            <div key={m.label} style={{ textAlign: 'center', minWidth: '50px' }}>
+              <div style={{ fontSize: '9px', color: 'var(--text-muted)', letterSpacing: '0.3px' }}>{m.label}</div>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: m.color }}>{m.value}</div>
             </div>
-            <div>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>
-                Analiz Basari Orani (1 Gun)
-              </div>
-              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Son 30 gun: {paperStats.wins1d}W / {paperStats.losses1d}L ({paperStats.checked1d} islem)
-                {paperStats.winRate3d !== null && ` | 3 Gun: %${paperStats.winRate3d}`}
-              </div>
-              <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                Ort. Getiri: 1G %{paperStats.avgPnl1d} | 3G %{paperStats.avgPnl3d}
-              </div>
-            </div>
-          </div>
-        )}
-        <div style={{
-          flex: 1, minWidth: '200px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)',
-          borderRadius: 'var(--radius)', padding: '14px 18px',
-          fontSize: '11px', color: 'var(--text-muted)', lineHeight: '1.6',
+          ))}
+        </div>
+
+        {/* Grafik linki */}
+        <a href={`/chart/${sym}`} style={{
+          fontSize: '10px', color: 'var(--blue)', textDecoration: 'none',
+          padding: '6px 12px', border: '1px solid var(--blue)', borderRadius: '4px', fontWeight: '600',
         }}>
-          <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--accent)', letterSpacing: '0.5px', marginBottom: '4px' }}>
-            VERI KAYNAGI
-          </div>
-          Veriler TradingView Scanner API'den alinmaktadir. Snapshot zamanlama farki nedeniyle TradingView web sitesiyle 1-3 puan fark olabilir. Bu yatirim tavsiyesi degildir.
-        </div>
+          Grafik
+        </a>
       </div>
 
-      {/* Analiz Raporu */}
+      {/* Kompakt bilgi satiri */}
+      <div style={{
+        display: 'flex', gap: '8px', marginBottom: '10px', fontSize: '10px', color: 'var(--text-muted)',
+        flexWrap: 'wrap', alignItems: 'center',
+      }}>
+        {paperStats && paperStats.checked1d > 0 && (
+          <span style={{
+            padding: '3px 10px', borderRadius: '4px',
+            backgroundColor: (paperStats.winRate1d || 0) >= 60 ? 'var(--green-bg)' : 'var(--accent-bg)',
+            color: (paperStats.winRate1d || 0) >= 60 ? 'var(--green)' : 'var(--accent)',
+            fontWeight: '600',
+          }}>
+            Basari: %{paperStats.winRate1d} ({paperStats.checked1d} islem, 30 gun)
+          </span>
+        )}
+        <span style={{ padding: '3px 10px', borderRadius: '4px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          Kaynak: TradingView Scanner API | 1-3 puan snapshot farki olabilir | Yatirim tavsiyesi degildir
+        </span>
+      </div>
+
+      {/* Analiz Raporu - KOMPAKT */}
       <div style={{
         backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)', padding: '20px', marginBottom: '16px',
+        borderRadius: 'var(--radius)', padding: '14px 16px', marginBottom: '10px',
       }}>
-        {/* Özet */}
-        <p style={{ fontSize: '14px', color: 'var(--text-primary)', lineHeight: '1.7', marginBottom: '16px' }}>
+        <p style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: '1.6', marginBottom: '10px', margin: 0 }}>
           {analysis.report.summary}
         </p>
 
         {/* Aksiyon Planı */}
         <div style={{
-          padding: '14px 18px', borderRadius: 'var(--radius-sm)',
+          padding: '10px 14px', borderRadius: 'var(--radius-sm)', marginTop: '10px',
           backgroundColor: analysis.signal === 'GUCLU_AL' || analysis.signal === 'AL'
             ? 'var(--green-bg)' : analysis.signal === 'SAT' || analysis.signal === 'GUCLU_SAT'
             ? 'var(--red-bg)' : 'var(--accent-bg)',
           border: `1px solid ${analysis.signal === 'GUCLU_AL' || analysis.signal === 'AL'
             ? 'rgba(0,216,151,0.2)' : analysis.signal === 'SAT' || analysis.signal === 'GUCLU_SAT'
             ? 'rgba(255,77,106,0.2)' : 'rgba(247,147,26,0.2)'}`,
-          marginBottom: '16px',
+          marginBottom: '10px',
         }}>
-          <div style={{ fontSize: '11px', fontWeight: '700', color: sigColor, letterSpacing: '0.5px', marginBottom: '6px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '700', color: sigColor, letterSpacing: '0.5px', marginBottom: '4px' }}>
             AKSIYON PLANI
           </div>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', margin: 0 }}>
+          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0 }}>
             {analysis.report.actionPlan}
           </p>
         </div>
@@ -236,7 +203,7 @@ export default function AnalysisPage() {
 
       {/* Skor Breakdown */}
       <div style={{
-        display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', gap: '10px', marginBottom: '16px',
+        display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', gap: '8px', marginBottom: '10px',
       }}>
         {([
           { key: 'technical', label: 'Teknik', weight: '40%' },
@@ -252,7 +219,7 @@ export default function AnalysisPage() {
 
       {/* Detaylı Yorumlar */}
       <div style={{
-        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px', marginBottom: '16px',
+        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px', marginBottom: '10px',
       }}>
         {([
           { title: 'Teknik Analiz', text: analysis.report.technicalView, color: 'var(--blue)' },
