@@ -185,9 +185,9 @@ export default function Dashboard() {
           </div>
 
           {/* Tablo */}
-          {scanLoading ? (
+          {scanLoading && scanData.length === 0 ? (
             <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
-              <div style={{ animation: 'shimmer 1.5s ease-in-out infinite' }}>{scanData.length > 0 ? `${scanData.length} hisse (cache)` : '300 hisse tam analiz ile taraniyor... (ilk yuklemede 2-3 dk surebilir)'}</div>
+              <div style={{ animation: 'shimmer 1.5s ease-in-out infinite' }}>Sinyal verileri yukleniyor...</div>
               <style>{`@keyframes shimmer { 0%,100%{opacity:.3} 50%{opacity:.8} }`}</style>
             </div>
           ) : (
