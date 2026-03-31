@@ -44,18 +44,51 @@ export default function PortfolioPage() {
 
   useEffect(() => { fetchPortfolio(); }, [fetchPortfolio]);
 
-  // Sinyal verisini cek (portfolio'dan bagimsiz - hep cek)
+  // Sinyal verisini cek - 2 kaynak: scan cache + tekil analiz
   const fetchSignals = useCallback(async () => {
     try {
+      // 1. Once scan cache'den tum sinyalleri al
       const res = await fetch('/api/analysis/scan');
-      const json = await res.json();
-      const map: Record<string, any> = {};
-      for (const item of (json.data || [])) {
-        map[item.symbol] = item;
+      if (res.ok) {
+        const json = await res.json();
+        const data = json.data || [];
+        if (data.length > 0) {
+          const map: Record<string, any> = {};
+          for (const item of data) map[item.symbol] = item;
+          setSignals(prev => ({ ...prev, ...map }));
+        }
       }
-      setSignals(map);
-    } catch {} finally { setSigLoading(false); }
-  }, []);
+    } catch {}
+
+    // 2. Portfoydeki hisseler icin tekil analiz cek (scan'da olmayabilir)
+    if (portfolio.length > 0) {
+      for (const p of portfolio) {
+        try {
+          const res = await fetch(`/api/analysis/${p.symbol}`);
+          if (res.ok) {
+            const json = await res.json();
+            if (json.data) {
+              setSignals(prev => ({
+                ...prev,
+                [p.symbol]: {
+                  symbol: p.symbol,
+                  signal: json.data.signal,
+                  signalText: json.data.signalText,
+                  score: json.data.compositeScore,
+                  price: json.data.price,
+                  changePct: json.data.changePercent,
+                  rsi: json.data.indicators?.rsi,
+                  confidence: json.data.confidence,
+                  riskLevel: json.data.riskLevel,
+                },
+              }));
+            }
+          }
+        } catch {}
+      }
+    }
+    setSigLoading(false);
+  }, [portfolio]);
 
   useEffect(() => {
     fetchSignals();
