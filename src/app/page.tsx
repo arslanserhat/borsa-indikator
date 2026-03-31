@@ -274,10 +274,18 @@ export default function Dashboard() {
                         <td style={{ padding: '6px 8px', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
                             {(item.signal === 'AL' || item.signal === 'GUCLU_AL') && (
-                              <button onClick={() => {
+                              <button onClick={async () => {
                                 setAddPopup({ symbol: item.symbol, price: item.price, name: item.name || '', score: item.score, signal: item.signalText });
                                 setAddQty('1000');
                                 setAddStatus('idle');
+                                // Canli fiyat cek
+                                try {
+                                  const r = await fetch(`/api/stock/${item.symbol}`);
+                                  if (r.ok) {
+                                    const d = await r.json();
+                                    if (d.data?.fiyat) setAddPopup(prev => prev ? { ...prev, price: d.data.fiyat } : null);
+                                  }
+                                } catch {}
                               }} style={{
                                 fontSize: '8px', fontWeight: '700', padding: '3px 6px', borderRadius: '3px',
                                 backgroundColor: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer',
@@ -381,10 +389,20 @@ export default function Dashboard() {
               <button disabled={addStatus === 'loading'} onClick={async () => {
                 setAddStatus('loading');
                 try {
+                  // ANLIK fiyat cek (cache degil, gercek zamanli)
+                  let livePrice = addPopup.price;
+                  try {
+                    const priceRes = await fetch(`/api/stock/${addPopup.symbol}`);
+                    if (priceRes.ok) {
+                      const priceData = await priceRes.json();
+                      if (priceData.data?.fiyat) livePrice = priceData.data.fiyat;
+                    }
+                  } catch {}
+
                   const res = await fetch('/api/user/portfolio', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ symbol: addPopup.symbol, quantity: parseInt(addQty) || 1000, avgCost: addPopup.price }),
+                    body: JSON.stringify({ symbol: addPopup.symbol, quantity: parseInt(addQty) || 1000, avgCost: livePrice }),
                   });
                   if (res.ok) { setAddStatus('ok'); setTimeout(() => setAddPopup(null), 1000); }
                   else setAddStatus('err');
