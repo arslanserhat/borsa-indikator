@@ -44,10 +44,9 @@ export default function PortfolioPage() {
 
   useEffect(() => { fetchPortfolio(); }, [fetchPortfolio]);
 
-  // Sinyal verisini cek - 2 kaynak: scan cache + tekil analiz
+  // Sinyal verisini cek - SADECE scan cache (dashboard ile ayni kaynak)
   const fetchSignals = useCallback(async () => {
     try {
-      // 1. Once scan cache'den tum sinyalleri al
       const res = await fetch('/api/analysis/scan');
       if (res.ok) {
         const json = await res.json();
@@ -55,40 +54,12 @@ export default function PortfolioPage() {
         if (data.length > 0) {
           const map: Record<string, any> = {};
           for (const item of data) map[item.symbol] = item;
-          setSignals(prev => ({ ...prev, ...map }));
+          setSignals(map);
         }
       }
     } catch {}
-
-    // 2. Portfoydeki hisseler icin tekil analiz cek (scan'da olmayabilir)
-    if (portfolio.length > 0) {
-      for (const p of portfolio) {
-        try {
-          const res = await fetch(`/api/analysis/${p.symbol}`);
-          if (res.ok) {
-            const json = await res.json();
-            if (json.data) {
-              setSignals(prev => ({
-                ...prev,
-                [p.symbol]: {
-                  symbol: p.symbol,
-                  signal: json.data.signal,
-                  signalText: json.data.signalText,
-                  score: json.data.compositeScore,
-                  price: json.data.price,
-                  changePct: json.data.changePercent,
-                  rsi: json.data.indicators?.rsi,
-                  confidence: json.data.confidence,
-                  riskLevel: json.data.riskLevel,
-                },
-              }));
-            }
-          }
-        } catch {}
-      }
-    }
     setSigLoading(false);
-  }, [portfolio]);
+  }, []);
 
   useEffect(() => {
     fetchSignals();

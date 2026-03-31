@@ -212,6 +212,37 @@ export default function Dashboard() {
                   color: signalFilter === k ? c : 'var(--text-muted)',
                 }}>{l}</button>
               ))}
+              <span style={{ width: '1px', height: '14px', backgroundColor: 'var(--border)', margin: '0 2px' }} />
+              {/* TOPLU PORTFOYE EKLE */}
+              <button onClick={async (e) => {
+                const btn = e.currentTarget;
+                const buyItems = filtered.filter(d => d.signal === 'AL' || d.signal === 'GUCLU_AL');
+                if (buyItems.length === 0) return;
+                btn.disabled = true;
+                btn.textContent = `${buyItems.length} hisse ekleniyor...`;
+                let ok = 0;
+                for (const item of buyItems) {
+                  try {
+                    // Her hisse icin canli fiyat cek
+                    let price = item.price;
+                    try { const r = await fetch(`/api/stock/${item.symbol}`); if (r.ok) { const d = await r.json(); if (d.data?.fiyat) price = d.data.fiyat; } } catch {}
+                    const res = await fetch('/api/user/portfolio', {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ symbol: item.symbol, quantity: 1000, avgCost: price }),
+                    });
+                    if (res.ok) ok++;
+                  } catch {}
+                }
+                btn.textContent = `${ok}/${buyItems.length} eklendi!`;
+                btn.style.backgroundColor = 'var(--green)';
+                setTimeout(() => { btn.textContent = `Tum AL (${buyItems.length})`; btn.disabled = false; btn.style.backgroundColor = ''; }, 3000);
+              }} style={{
+                padding: '3px 8px', fontSize: '8px', fontWeight: '700', borderRadius: '3px',
+                border: '1px solid var(--green)', cursor: 'pointer',
+                backgroundColor: 'var(--green-bg)', color: 'var(--green)',
+              }}>
+                Tum AL ({filtered.filter(d => d.signal === 'AL' || d.signal === 'GUCLU_AL').length})
+              </button>
             </div>
           </div>
 
