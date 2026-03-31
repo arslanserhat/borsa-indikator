@@ -738,6 +738,49 @@ export async function analyzeStock(symbol: string, options?: { skipNews?: boolea
     compositeScore += macroState.scoreAdjustment;
   } catch { macroState = null; }
 
+  // === GUVENLIK KONTROLLERI (yeni) ===
+
+  // 1. RSI ASIRI ALIM CEZASI: RSI 70+ ise AL sinyali vermek tehlikeli
+  //    RSI 70-80: -5 puan, RSI 80+: -10 puan (duzeltme riski cok yuksek)
+  if (indicators.rsi >= 80) {
+    compositeScore -= 10;
+  } else if (indicators.rsi >= 75) {
+    compositeScore -= 7;
+  } else if (indicators.rsi >= 70) {
+    compositeScore -= 5;
+  }
+  // RSI asiri satim bonusu (dip alis firsati)
+  if (indicators.rsi <= 25) {
+    compositeScore += 5;
+  } else if (indicators.rsi <= 30) {
+    compositeScore += 3;
+  }
+
+  // 2. ADX ZAYIF TREND FILTRESI: ADX < 20 = trend yok, sinyal guvenilmez
+  //    ADX < 15: -8 puan, ADX 15-20: -4 puan
+  if (indicators.adx < 15) {
+    compositeScore -= 8;
+  } else if (indicators.adx < 20) {
+    compositeScore -= 4;
+  }
+
+  // 3. TREND CELISKISI: EMA trend asagi ama skor AL bolgesi = tehlikeli
+  //    Fiyat EMA200 altinda + trend down = -6 puan
+  const emaDown = indicators.ema10 < indicators.ema20 && indicators.ema20 < indicators.ema50;
+  const below200 = indicators.close < indicators.ema200;
+  if (emaDown && below200 && compositeScore >= 55) {
+    compositeScore -= 6;
+  } else if (below200 && compositeScore >= 55) {
+    compositeScore -= 3;
+  }
+
+  // 4. GUN ICI SERT DUSUS: Gunde -%3'ten fazla dusen hisse = dikkat
+  if (indicators.changePercent <= -5) {
+    compositeScore -= 5;
+  } else if (indicators.changePercent <= -3) {
+    compositeScore -= 3;
+  }
+
   // Final clamp - skor asla 0'dan küçük veya 100'den büyük olamaz
   compositeScore = Math.max(0, Math.min(100, compositeScore));
 
