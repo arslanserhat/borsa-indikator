@@ -44,9 +44,8 @@ export default function PortfolioPage() {
 
   useEffect(() => { fetchPortfolio(); }, [fetchPortfolio]);
 
-  // Portföydeki hisseler için sinyal çek
+  // Sinyal verisini cek (portfolio'dan bagimsiz - hep cek)
   const fetchSignals = useCallback(async () => {
-    if (portfolio.length === 0) { setSigLoading(false); return; }
     try {
       const res = await fetch('/api/analysis/scan');
       const json = await res.json();
@@ -56,7 +55,7 @@ export default function PortfolioPage() {
       }
       setSignals(map);
     } catch {} finally { setSigLoading(false); }
-  }, [portfolio]);
+  }, []);
 
   useEffect(() => {
     fetchSignals();
