@@ -230,7 +230,7 @@ export default function Dashboard() {
                     <th style={thS}>Degisim</th>
                     <th style={thS}>RSI</th>
                     <th style={thS}>Trend</th>
-                    <th style={thS}></th>
+                    <th style={thS}>Islem</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -269,7 +269,40 @@ export default function Dashboard() {
                           }}>{item.trendUp && item.above200 ? '▲' : !item.trendUp && !item.above200 ? '▼' : '~'}</span>
                         </td>
                         <td style={{ padding: '6px 8px', textAlign: 'center' }}>
-                          <a href={`/analiz/${item.symbol}`} style={{ fontSize: '9px', color: 'var(--text-muted)', textDecoration: 'none' }}>&#8250;</a>
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                            {(item.signal === 'AL' || item.signal === 'GUCLU_AL') && (
+                              <button onClick={async (e) => {
+                                const btn = e.currentTarget;
+                                btn.disabled = true;
+                                btn.textContent = '...';
+                                try {
+                                  const res = await fetch('/api/user/portfolio', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ symbol: item.symbol, quantity: 1000, avgCost: item.price }),
+                                  });
+                                  if (res.ok) {
+                                    btn.textContent = '✓';
+                                    btn.style.backgroundColor = 'var(--green)';
+                                  } else {
+                                    btn.textContent = '!';
+                                    btn.style.backgroundColor = 'var(--red)';
+                                  }
+                                } catch {
+                                  btn.textContent = '!';
+                                }
+                                setTimeout(() => { btn.textContent = '+PF'; btn.disabled = false; btn.style.backgroundColor = 'var(--accent)'; }, 2000);
+                              }} style={{
+                                fontSize: '8px', fontWeight: '700', padding: '3px 6px', borderRadius: '3px',
+                                backgroundColor: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer',
+                              }}>+PF</button>
+                            )}
+                            <a href={`/analiz/${item.symbol}`} style={{
+                              fontSize: '8px', fontWeight: '600', padding: '3px 6px', borderRadius: '3px',
+                              backgroundColor: 'var(--bg-hover)', color: 'var(--text-muted)', textDecoration: 'none',
+                              border: '1px solid var(--border)',
+                            }}>Analiz</a>
+                          </div>
                         </td>
                       </tr>
                     );
