@@ -37,9 +37,19 @@ export default function Dashboard() {
   const fetchScan = useCallback(async () => {
     try {
       const res = await fetch('/api/analysis/scan');
+      if (!res.ok) { setScanLoading(false); return; }
       const json = await res.json();
-      setScanData(json.data || []);
-    } catch {} finally { setScanLoading(false); }
+      const data = json.data || [];
+      if (data.length > 0) {
+        setScanData(data);
+        setScanLoading(false);
+      } else if (json.scanning) {
+        // Tarama devam ediyor, 10sn sonra tekrar dene
+        setTimeout(fetchScan, 10000);
+      } else {
+        setScanLoading(false);
+      }
+    } catch { setScanLoading(false); }
   }, []);
 
   useEffect(() => {
