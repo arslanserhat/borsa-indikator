@@ -15,6 +15,9 @@ export default function Dashboard() {
   const [scanData, setScanData] = useState<any[]>([]);
   const [scanLoading, setScanLoading] = useState(true);
   const [endeksFilter, setEndeksFilter] = useState('');
+  const [addPopup, setAddPopup] = useState<{ symbol: string; price: number; name: string; score: number; signal: string } | null>(null);
+  const [addQty, setAddQty] = useState('1000');
+  const [addStatus, setAddStatus] = useState<'idle' | 'loading' | 'ok' | 'err'>('idle');
   const [signalFilter, setSignalFilter] = useState('');
 
   const isMobile = useIsMobile();
@@ -271,27 +274,10 @@ export default function Dashboard() {
                         <td style={{ padding: '6px 8px', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
                             {(item.signal === 'AL' || item.signal === 'GUCLU_AL') && (
-                              <button onClick={async (e) => {
-                                const btn = e.currentTarget;
-                                btn.disabled = true;
-                                btn.textContent = '...';
-                                try {
-                                  const res = await fetch('/api/user/portfolio', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ symbol: item.symbol, quantity: 1000, avgCost: item.price }),
-                                  });
-                                  if (res.ok) {
-                                    btn.textContent = '✓';
-                                    btn.style.backgroundColor = 'var(--green)';
-                                  } else {
-                                    btn.textContent = '!';
-                                    btn.style.backgroundColor = 'var(--red)';
-                                  }
-                                } catch {
-                                  btn.textContent = '!';
-                                }
-                                setTimeout(() => { btn.textContent = '+PF'; btn.disabled = false; btn.style.backgroundColor = 'var(--accent)'; }, 2000);
+                              <button onClick={() => {
+                                setAddPopup({ symbol: item.symbol, price: item.price, name: item.name || '', score: item.score, signal: item.signalText });
+                                setAddQty('1000');
+                                setAddStatus('idle');
                               }} style={{
                                 fontSize: '8px', fontWeight: '700', padding: '3px 6px', borderRadius: '3px',
                                 backgroundColor: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer',
@@ -323,6 +309,97 @@ export default function Dashboard() {
           <MiniPanel title="Hacim Liderleri" items={topVolume} loading={loading} type="volume" />
         </div>
       </div>
+
+      {/* PORTFOYE EKLE POPUP */}
+      {addPopup && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => setAddPopup(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)',
+            borderRadius: '12px', padding: '24px', width: '380px', maxWidth: '90vw',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <div style={{ fontSize: '18px', fontWeight: '700' }}>{addPopup.symbol}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{addPopup.name}</div>
+              </div>
+              <span style={{
+                fontSize: '9px', fontWeight: '700', padding: '3px 8px', borderRadius: '4px',
+                backgroundColor: addPopup.signal.includes('AL') ? 'var(--green)' : 'var(--accent)',
+                color: '#000',
+              }}>{addPopup.signal} ({addPopup.score})</span>
+            </div>
+
+            <div style={{
+              backgroundColor: 'var(--bg-hover)', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <div>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Guncel Fiyat</div>
+                <div style={{ fontSize: '22px', fontWeight: '700', fontVariantNumeric: 'tabular-nums' }}>
+                  {addPopup.price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Toplam Tutar</div>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>
+                  {(parseFloat(addQty || '0') * addPopup.price).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Adet</label>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {['100', '500', '1000', '5000'].map(q => (
+                  <button key={q} onClick={() => setAddQty(q)} style={{
+                    flex: 1, padding: '6px', borderRadius: '4px', border: '1px solid',
+                    borderColor: addQty === q ? 'var(--accent)' : 'var(--border)',
+                    backgroundColor: addQty === q ? 'var(--accent-bg)' : 'transparent',
+                    color: addQty === q ? 'var(--accent)' : 'var(--text-muted)',
+                    cursor: 'pointer', fontSize: '11px', fontWeight: '600',
+                  }}>{q}</button>
+                ))}
+                <input value={addQty} onChange={e => setAddQty(e.target.value)} type="number"
+                  style={{
+                    width: '80px', padding: '6px 8px', borderRadius: '4px',
+                    border: '1px solid var(--border)', backgroundColor: 'var(--bg-hover)',
+                    color: 'var(--text-primary)', fontSize: '11px', outline: 'none', textAlign: 'center',
+                  }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setAddPopup(null)} style={{
+                flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid var(--border)',
+                backgroundColor: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+                fontSize: '12px', fontWeight: '600',
+              }}>Iptal</button>
+              <button disabled={addStatus === 'loading'} onClick={async () => {
+                setAddStatus('loading');
+                try {
+                  const res = await fetch('/api/user/portfolio', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbol: addPopup.symbol, quantity: parseInt(addQty) || 1000, avgCost: addPopup.price }),
+                  });
+                  if (res.ok) { setAddStatus('ok'); setTimeout(() => setAddPopup(null), 1000); }
+                  else setAddStatus('err');
+                } catch { setAddStatus('err'); }
+              }} style={{
+                flex: 2, padding: '10px', borderRadius: '6px', border: 'none',
+                backgroundColor: addStatus === 'ok' ? 'var(--green)' : addStatus === 'err' ? 'var(--red)' : 'var(--accent)',
+                color: '#000', cursor: 'pointer', fontSize: '12px', fontWeight: '700',
+              }}>
+                {addStatus === 'loading' ? 'Ekleniyor...' : addStatus === 'ok' ? 'Eklendi!' : addStatus === 'err' ? 'Hata! Tekrar Dene' : `Portfoye Ekle (${addPopup.price.toFixed(2)} TL)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
